@@ -103,6 +103,10 @@ Ungültige Angaben (falsche Anzahl, Werte außerhalb 0–100, doppelte Werte) fa
 - Die Learnings-Datenbank wandert nie ins Repo – sie gehört dem jeweiligen Nutzer.
 - Es ersetzt keine Projektdokumentation. Handoffs sind bewusst flüchtig; was dauerhaft zählt, gehört ins Changelog oder in die Doku.
 
+## Credits
+
+Der `handoff`-Skill basiert auf [Matt Pococks `handoff`](https://github.com/mattpocock/skills/tree/main/skills/productivity/handoff) – erweitert um den projekt-lokalen Speicherort, das automatische Wiedereinlesen per Sessionstart-Hook und die messbasierte Auslösung durch den Kontext-Wächter. Danke für die Grundidee, die dieses Plugin zu Ende denkt: Eine Session-Übergabe ist erst dann ein Gedächtnis, wenn niemand daran denken muss.
+
 ## Deaktivieren / Entfernen
 
 ```
