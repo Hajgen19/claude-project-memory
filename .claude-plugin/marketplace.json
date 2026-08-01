@@ -1,5 +1,6 @@
 {
   "name": "claude-project-memory",
+  "description": "Marketplace des project-memory-Plugins: Projektgedaechtnis fuer Claude Code (Kontext-Waechter, Session-Handoff, Changelog, Learnings-Datenbank).",
   "owner": {
     "name": "Hajgen19",
     "url": "https://github.com/Hajgen19"

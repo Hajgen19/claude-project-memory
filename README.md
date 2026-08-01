@@ -35,13 +35,16 @@ Beide Automatiken sind **Hooks** – kleine Python-Skripte, die Claude Code selb
 
 Nach einer Kompaktierung sind alle Stufen automatisch wieder scharf (neuer Zyklus, erkannt am compact-Event und zusätzlich am Token-Einbruch).
 
+**Warum unterbricht der Wächter, statt sanft zu erinnern?** Bewusste Design-Entscheidung: Der Zwischenruf nutzt den Block-Mechanismus des Stop-Hooks, weil nur er einen *sofortigen* Arbeitsschritt erzwingt. Eine sanfte Kontext-Notiz würde erst beim nächsten User-Prompt wirken – der vielleicht nie kommt (Session einfach geschlossen) oder erst nach der Kompaktierung, also genau zu spät. Ein Wächter, der höflich wartet, bis jemand wieder etwas sagt, ist keiner.
+
 **Sessionstart-Hook**: Lädt beim Start, nach `/clear` und nach jeder Kompaktierung das jüngste Übergabedokument (nach Kompaktierung bevorzugt das der eigenen Session – parallele Sessions im selben Projekt kommen sich nicht in die Quere) und die Symptom-Kurzübersicht der Learnings-Datenbank in den frischen Kontext. Die neue Session weiß sofort, wo die letzte aufgehört hat und welche Probleme schon gelöst wurden. Wurde `memory-init` im Projekt noch nie ausgeführt, erinnert der Hook außerdem einmal pro Session daran.
 
 **Skills:**
 
 | Skill | Aufruf | Zweck |
 |---|---|---|
-| `memory-init` | `/project-memory:memory-init` | Das Andock-Ritual: `.gitignore` absichern, `changelog/` starten, optional CLAUDE.md-Sektion + Kontextfenster-Konfiguration. Einmal pro Projekt. |
+| `memory-init` | `/project-memory:memory-init` | Das Andock-Ritual: `.gitignore` absichern, `changelog/` starten, Wächter-Konfiguration eintragen, optional CLAUDE.md-Sektion. Einmal pro Projekt. |
+| `doctor` | `/project-memory:doctor` | Funktions-Diagnose auf Zuruf: prüft Python, Hook-Registrierung, Marker, Schreibrechte, Konfiguration und die komplette Hook-Kette. Die Antwort auf das Fail-silent-Design – jederzeit, ändert nichts. |
 | `handoff` | `/project-memory:handoff` | Manuelle Session-Übergabe nach `tmp/handoff/`, jederzeit. |
 | `knowledge-base-entry` | `/project-memory:knowledge-base-entry` oder „neues Learning" | Strukturierter Eintrag in die Wissensdatenbank (Symptom → Root Cause → Fix → Tags), formaterhaltend, mit Volltext-Suche per Symptom-Wortlaut. |
 
