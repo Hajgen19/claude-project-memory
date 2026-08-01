@@ -34,6 +34,7 @@ import sys
 import time
 
 WINDOW_DEFAULT = 200_000
+WINDOW_1M = 1_000_000
 STAGE1_PCT = 25.0  # Changelog-Check
 STAGE2_PCT = 60.0  # Handoff + Changelog + Learnings
 STAGE3_PCT = 85.0  # Handoff-Update
@@ -51,7 +52,7 @@ def read_stdin_json():
 
 
 def read_context_tokens(transcript_path):
-    """Liefert den Kontextverbrauch der letzten Haupt-Antwort in Tokens (oder None).
+    """(tokens, modell_id) der letzten Haupt-Antwort – oder (None, None).
 
     Liest die letzten TAIL_BYTES des Transcripts und sucht rückwärts die
     jüngste Assistant-Zeile mit usage-Block. input + cache_read + cache_creation
@@ -74,25 +75,66 @@ def read_context_tokens(transcript_path):
             continue
         if obj.get("isSidechain"):
             continue  # Subagenten-Zeilen zählen nicht als Hauptkontext
-        usage = (obj.get("message") or {}).get("usage") or {}
+        message = obj.get("message") or {}
+        usage = message.get("usage") or {}
         if "input_tokens" not in usage:
             continue
-        return (
+        tokens = (
             (usage.get("input_tokens") or 0)
             + (usage.get("cache_read_input_tokens") or 0)
             + (usage.get("cache_creation_input_tokens") or 0)
         )
-    return None
+        return tokens, str(message.get("model") or "")
+    return None, None
+
+
+def resolve_window(env_value, cached_window, tokens, model):
+    """Effektives Kontextfenster bestimmen (v1.1: Auto-Erkennung).
+
+    Prioritäten:
+      1. Beweis dieser Messung: Übersteigen die gemessenen Tokens das
+         angenommene Fenster, IST das Fenster größer – hochschalten auf 1M.
+      2. Modell-ID-Hinweis: trägt sie eine 1M-Kennung ("[1m]"), sofort 1M.
+      3. In dieser Session bereits erkanntes Fenster (Marker-Cache) – sonst
+         fiele die Erkenntnis nach einer Kompaktierung zurück.
+      4. Explizites CLAUDE_CONTEXT_WINDOW aus der Projekt-settings.json.
+      5. Default 200000.
+
+    Rückgabe: (fenster, erkannt_bool) – erkannt=True, wenn 1/2 gegriffen
+    haben und der Wert in den Marker gecacht werden soll.
+    """
+    try:
+        window = int(env_value) if env_value else WINDOW_DEFAULT
+    except ValueError:
+        window = WINDOW_DEFAULT
+    if window <= 0:
+        window = WINDOW_DEFAULT
+
+    if cached_window and cached_window > window:
+        window = cached_window
+
+    detected = False
+    if model and "[1m]" in model.lower() and window < WINDOW_1M:
+        window = WINDOW_1M
+        detected = True
+    if tokens and tokens > window:
+        window = WINDOW_1M
+        detected = True
+    return window, detected
 
 
 def load_state(state_file):
-    """(stage, letzter_gemessener_prozentwert) aus der Marker-Datei."""
+    """(stage, letzter_prozentwert, erkanntes_fenster) aus der Marker-Datei."""
     try:
         with open(state_file, encoding="utf-8") as f:
             data = json.load(f)
-        return int(data.get("stage", 0)), float(data.get("pct", 0.0))
+        return (
+            int(data.get("stage", 0)),
+            float(data.get("pct", 0.0)),
+            int(data.get("window_detected") or 0),
+        )
     except (OSError, ValueError, TypeError):
-        return 0, 0.0
+        return 0, 0.0, 0
 
 
 def session_start_time(transcript_path):
@@ -222,31 +264,29 @@ def main():
     if not transcript or not os.path.isfile(transcript):
         return
     project = os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd") or "."
-    try:
-        window = int(os.environ.get("CLAUDE_CONTEXT_WINDOW") or WINDOW_DEFAULT)
-    except ValueError:
-        window = WINDOW_DEFAULT
-    if window <= 0:
-        window = WINDOW_DEFAULT
 
     # Die usage-Zeile der soeben beendeten Antwort wird u. U. erst NACH dem
     # Stop-Event ins Transcript geflusht (Race, v. a. beim ersten Stop einer
     # frischen Session). Kurz nachfassen, bevor wir aufgeben.
-    tokens = read_context_tokens(transcript)
+    tokens, model = read_context_tokens(transcript)
     for _ in range(4):
         if tokens:
             break
         time.sleep(0.7)
-        tokens = read_context_tokens(transcript)
+        tokens, model = read_context_tokens(transcript)
     if not tokens:
         return
-    pct = tokens * 100.0 / window
     today = datetime.date.today().isoformat()
 
     session = (payload.get("session_id") or "unbekannt")[:8]
     state_dir = os.path.join(project, "tmp", "handoff")
     state_file = os.path.join(state_dir, f".state-{session}.json")
-    stage, last_pct = load_state(state_file)
+    stage, last_pct, cached_window = load_state(state_file)
+
+    window, detected = resolve_window(
+        os.environ.get("CLAUDE_CONTEXT_WINDOW"), cached_window, tokens, model
+    )
+    pct = tokens * 100.0 / window
 
     # Kompaktierung erkennen: Fällt der Verbrauch deutlich unter den beim
     # letzten Lauf gemessenen Stand, beginnt ein neuer Zyklus – Stufen wieder
@@ -271,10 +311,14 @@ def main():
             stage = 1
 
     # Marker bei JEDEM Lauf schreiben: pct dient dem nächsten Lauf als
-    # Referenz für die Kompaktierungs-Erkennung und darf nicht veralten.
+    # Referenz für die Kompaktierungs-Erkennung, window_detected konserviert
+    # ein per Beweis erkanntes 1M-Fenster über Kompaktierungen hinweg.
     ensure_state_dir(state_dir)
+    state = {"stage": new_stage or stage, "pct": round(pct, 1)}
+    if detected or cached_window:
+        state["window_detected"] = max(window if detected else 0, cached_window)
     with open(state_file, "w", encoding="utf-8") as f:
-        json.dump({"stage": new_stage or stage, "pct": round(pct, 1)}, f)
+        json.dump(state, f)
     if new_stage is None:
         return
 

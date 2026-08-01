@@ -147,11 +147,25 @@ def learnings_lookup(project):
 
 
 def reset_guard_marker(project, session):
-    """Stufen-Marker der eigenen Session löschen (neuer Kompaktierungszyklus)."""
+    """Stufen des Kontext-Wächters freigeben (neuer Kompaktierungszyklus).
+
+    Nur die Stufe wird genullt – ein per Messung erkanntes Kontextfenster
+    (window_detected) bleibt erhalten, sonst fiele die Erkenntnis nach jeder
+    Kompaktierung zurück und die Stufen kämen wieder zu früh.
+    """
     if not session:
         return
+    path = os.path.join(project, "tmp", "handoff", f".state-{session}.json")
     try:
-        os.remove(os.path.join(project, "tmp", "handoff", f".state-{session}.json"))
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return
+    data["stage"] = 0
+    data["pct"] = 0.0
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
     except OSError:
         pass
 

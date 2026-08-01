@@ -55,7 +55,7 @@ Der Init-Schritt ist wichtig: Er trägt `tmp/handoff/` und die Learnings-Dateina
 ## Voraussetzungen & Konfiguration
 
 - **Python 3.x** – die beiden Hooks sind Python-Skripte (nur Standardbibliothek). Sie rufen `python` auf; auf macOS/Linux-Systemen, die nur `python3` kennen, hilft der Hinweis-Abschnitt in `memory-init` (Alias/Homebrew). Fehlt Python, bleibt das Plugin still – die Session funktioniert normal, nur ohne Sicherheitsnetz.
-- **Kontextfenster:** Der Wächter rechnet gegen `CLAUDE_CONTEXT_WINDOW` (Default `200000`). Bei 1M-Kontext-Modellen in der Projekt-`settings.json` setzen (macht `memory-init` auf Wunsch):
+- **Kontextfenster – mit Auto-Erkennung (v1.1):** Der Wächter rechnet gegen `CLAUDE_CONTEXT_WINDOW` (Default `200000`) und korrigiert sich selbst: Übersteigen die *gemessenen* Tokens das angenommene Fenster, ist das Fenster beweisbar größer – der Wächter schaltet auf `1000000` um und merkt sich das für den Rest der Session (überlebt auch Kompaktierungen). Trägt die Modell-ID im Transcript eine `[1m]`-Kennung, greift die Umschaltung sofort. Der explizite Eintrag in der Projekt-`settings.json` bleibt trotzdem empfohlen (macht `memory-init` auf Wunsch), denn er stimmt von der ersten Antwort an – die Beweis-Erkennung greift naturgemäß erst, sobald 200k überschritten sind; bis dahin kämen die Zwischenrufe in einer 1M-Session zu früh:
 
 ```json
 {

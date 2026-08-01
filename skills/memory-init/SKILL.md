@@ -92,7 +92,7 @@ Diff zeigen, Bestätigung abwarten, dann schreiben. Bestehenden CLAUDE.md-Inhalt
 
 ## Schritt 5: Kontextfenster konfigurieren (empfohlen)
 
-Der Kontext-Wächter rechnet gegen `CLAUDE_CONTEXT_WINDOW` (Default `200000`). Frage den User, welches Kontextfenster sein Claude-Modell hat (Standard: 200k; 1M-Kontext-Modelle: 1000000). Weicht es vom Default ab, biete an, es in `.claude/settings.json` des Projekts einzutragen (Datei bzw. `env`-Block bei Bedarf anlegen, bestehende Einträge unangetastet lassen):
+Der Kontext-Wächter rechnet gegen `CLAUDE_CONTEXT_WINDOW` (Default `200000`) und hat seit v1.1 eine Selbstkorrektur: Messen die Hooks mehr Tokens, als das angenommene Fenster hergibt, schalten sie auf 1M um und merken sich das. Der explizite Eintrag ist trotzdem die bessere Wahl, weil er ab der ersten Antwort stimmt – die Beweis-Erkennung greift erst, wenn 200k real überschritten sind. Frage den User, welches Kontextfenster sein Claude-Modell hat (Standard: 200k; 1M-Kontext-Modelle: 1000000). Weicht es vom Default ab, biete an, es in `.claude/settings.json` des Projekts einzutragen (Datei bzw. `env`-Block bei Bedarf anlegen, bestehende Einträge unangetastet lassen):
 
 ```json
 {
