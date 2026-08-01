@@ -60,7 +60,7 @@ Danach im jeweiligen Projekt einmalig andocken:
 /project-memory:memory-init
 ```
 
-Der Init-Schritt ist wichtig: Er trägt die Learnings-Dateinamen in die `.gitignore` ein (sonst landet deine persönliche Wissensdatenbank im Repo), startet die Changelog-Konvention, prüft, ob die Hooks wirklich laufen, und bietet an, die Konventionen in der CLAUDE.md zu verankern. Jeder Schritt zeigt vor dem Schreiben ein Diff – nichts wird ungefragt geändert. Vergisst du den Schritt, erinnert dich das Plugin beim nächsten Sessionstart daran.
+Der Init-Schritt ist wichtig: Er trägt die Learnings-Dateinamen in die `.gitignore` ein (sonst landet deine persönliche Wissensdatenbank im Repo), startet die Changelog-Konvention, prüft, ob die Hooks wirklich laufen, **schreibt Kontextfenster und Wächter-Schwellen explizit in die `.claude/settings.json` des Projekts** (damit du beide Stellschrauben siehst und jederzeit ändern kannst, statt auf unsichtbaren Defaults zu sitzen) und bietet an, die Konventionen in der CLAUDE.md zu verankern. Jeder Schritt zeigt vor dem Schreiben ein Diff – nichts wird ungefragt geändert. Vergisst du den Schritt, erinnert dich das Plugin beim nächsten Sessionstart daran.
 
 ## Voraussetzungen & Konfiguration
 

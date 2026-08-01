@@ -92,25 +92,27 @@ Frage den User: *„Soll ich die Projektgedächtnis-Konventionen in deine CLAUDE
 
 Diff zeigen, Bestätigung abwarten, dann schreiben. Bestehenden CLAUDE.md-Inhalt niemals verändern, nur anfügen.
 
-## Schritt 5: Kontextfenster konfigurieren (empfohlen)
+## Schritt 5: Wächter konfigurieren (PFLICHT – beide Werte explizit eintragen)
 
-Der Kontext-Wächter rechnet gegen `CLAUDE_CONTEXT_WINDOW` (Default `200000`) und hat seit v1.1 eine Selbstkorrektur: Messen die Hooks mehr Tokens, als das angenommene Fenster hergibt, schalten sie auf 1M um und merken sich das. Der explizite Eintrag ist trotzdem die bessere Wahl, weil er ab der ersten Antwort stimmt – die Beweis-Erkennung greift erst, wenn 200k real überschritten sind. Frage den User, welches Kontextfenster sein Claude-Modell hat (Standard: 200k; 1M-Kontext-Modelle: 1000000). Weicht es vom Default ab, biete an, es in `.claude/settings.json` des Projekts einzutragen (Datei bzw. `env`-Block bei Bedarf anlegen, bestehende Einträge unangetastet lassen):
+Der Kontext-Wächter liest zwei Werte aus `.claude/settings.json` des Projekts; stehen sie dort nicht, gelten unsichtbare Code-Defaults. **Trage beide IMMER explizit ein** – auch wenn der User die Defaults wählt: Eine sichtbare Zeile ist die einzige Konfiguration, die der User später wiederfindet und ändern kann. (Datei bzw. `env`-Block bei Bedarf anlegen, bestehende Einträge unangetastet lassen.)
+
+1. **`CLAUDE_CONTEXT_WINDOW`** – Frage den User, welches Kontextfenster sein Claude-Modell hat (Standard: `200000`; 1M-Kontext-Modelle: `1000000`). Die Selbstkorrektur (v1.1: Umschalten auf 1M bei Messbeweis) bleibt als Netz, aber der explizite Eintrag stimmt ab der ersten Antwort.
+2. **`CLAUDE_MEMORY_STAGES`** – Frage den User, ob er die Standard-Schwellen `25,60,85` behalten oder eigene setzen will (drei Prozentwerte, aufsteigend: Gedächtnis-Check / Erst-Handoff / Handoff-Update). Erkläre dabei die Warnung: Der dritte Wert braucht Puffer vor der Kompaktierung – eine lange Antwort kann 5–10 Punkte springen, bei `95` fiele das letzte Update womöglich aus. Den gewählten (oder Default-)Wert eintragen.
 
 ```json
 {
   "env": {
-    "CLAUDE_CONTEXT_WINDOW": "1000000"
+    "CLAUDE_CONTEXT_WINDOW": "1000000",
+    "CLAUDE_MEMORY_STAGES": "25,60,85"
   }
 }
 ```
-
-Erwähne dabei in einem Satz, dass auch die drei Wächter-Schwellen anpassbar sind (`CLAUDE_MEMORY_STAGES`, z. B. `"20,50,80"`; Default `25,60,85`) – aber nur eintragen, wenn der User es ausdrücklich möchte. Die Defaults sind bewusst gewählt (insb. der 85er-Puffer vor der Kompaktierung).
 
 ## Schritt 6: Abschluss
 
 **Init-Marker schreiben (Pflicht):** Datei `tmp/handoff/.init-done` mit dem heutigen Datum als Inhalt anlegen (Ordner bei Bedarf inkl. `.gitignore` mit `*`). Der Sessionstart-Hook hört damit auf, an das Andocken zu erinnern.
 
-Dann kompakt melden: was geändert wurde (mit Pfaden), was übersprungen wurde und warum – plus zwei Pflicht-Informationen: (1) „Der Wächter meldet sich bei ca. 25/60/85 % Kontextfüllung mit dem Präfix `[project-memory · Kontext-Wächter]` – das ist dieses Plugin, kein Fehler" (bei angepassten Schwellen die tatsächlichen Werte nennen); (2) die Faustregel: *Interessiert es in einem Jahr noch jemanden → Changelog. Interessiert es nur die nächste Session → Handoff. Gelöstes technisches Problem → Learnings.* Dazu die Werkzeuge, die der User ab jetzt kennt:
+Dann kompakt melden: was geändert wurde (mit Pfaden), was übersprungen wurde und warum – plus drei Pflicht-Informationen: (1) „Der Wächter meldet sich bei [den in Schritt 5 gesetzten Schwellen] % Kontextfüllung mit dem Präfix `[project-memory · Kontext-Wächter]` – das ist dieses Plugin, kein Fehler"; (2) „Beide Stellschrauben (Kontextfenster + Schwellen) stehen in `.claude/settings.json` und können dort jederzeit geändert werden"; (3) die Faustregel: *Interessiert es in einem Jahr noch jemanden → Changelog. Interessiert es nur die nächste Session → Handoff. Gelöstes technisches Problem → Learnings.* Dazu die Werkzeuge, die der User ab jetzt kennt:
 
 - `/project-memory:handoff` – manuelle Session-Übergabe
 - `/project-memory:knowledge-base-entry` bzw. „neues Learning" – Wissensdatenbank-Eintrag
