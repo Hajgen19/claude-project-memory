@@ -94,7 +94,9 @@ def pick_handoff(project, session, session_started):
     selben Projekt dürfen den eigenen Stand nicht verdrängen, und ein frisches
     manuelles Handoff darf nicht gegen ein älteres Wächter-Handoff verlieren.
     """
-    all_files = glob.glob(os.path.join(project, "tmp", "handoff", "*.md"))
+    # Nur echte Übergabedokumente (handoff-*.md) – der Ordner enthält auch
+    # eine selbst angelegte README.md, die nie als Handoff gelten darf.
+    all_files = glob.glob(os.path.join(project, "tmp", "handoff", "handoff-*.md"))
     if not all_files:
         return None
     own = [p for p in all_files if session and session in os.path.basename(p)]
@@ -190,6 +192,12 @@ def main():
         reset_guard_marker(project, session)
     cleanup_state(project)
 
+    # Bei compact UND resume läuft dieselbe Session weiter – Handoffs der
+    # eigenen Session-ID bzw. der eigenen Laufzeit haben Vorrang. Bei fork
+    # entsteht eine neue Session-ID (Ursprung nicht zuverlässig bestimmbar):
+    # wie startup behandeln, also projektweit jüngstes Handoff.
+    own_session = source in ("compact", "resume")
+
     parts = []
     # Onboarding-Netz: Lief memory-init in diesem Projekt noch nie (keine
     # Marker-Datei), bekommt das Modell einen Einzeiler mit – es erwähnt den
@@ -206,8 +214,8 @@ def main():
             "bei passender Gelegenheit EINMAL kurz darauf hin (ein Satz genügt, "
             "nicht wiederholen, nicht drängen)."
         )
-    started = session_start_time(payload.get("transcript_path")) if source == "compact" else None
-    handoff = pick_handoff(project, session if source == "compact" else "", started)
+    started = session_start_time(payload.get("transcript_path")) if own_session else None
+    handoff = pick_handoff(project, session if own_session else "", started)
     if handoff:
         name, age_days, content = handoff
         alter = "heute" if age_days == 0 else f"vor {age_days} Tag(en)"

@@ -286,6 +286,18 @@ class TestSessionStart(unittest.TestCase):
         self.assertIn("SympX", tabelle)
         self.assertNotIn("voll", tabelle)
 
+    def test_ordner_readme_ist_kein_handoff(self):
+        # ensure_state_dir legt eine README.md in tmp/handoff/ – die darf
+        # NIE als Übergabedokument eingespeist werden (v1.5.1-Regression).
+        with open(os.path.join(self.handoff_dir, "README.md"), "w", encoding="utf-8") as f:
+            f.write("# tmp/handoff/ – Ordnerbeschreibung")
+        self.assertIsNone(ss.pick_handoff(self.dir.name, "", None))
+        echt = os.path.join(self.handoff_dir, "handoff-2026-08-01-abcd1234.md")
+        with open(echt, "w", encoding="utf-8") as f:
+            f.write("ECHT")
+        name, _, content = ss.pick_handoff(self.dir.name, "", None)
+        self.assertEqual(content, "ECHT")
+
     def test_marker_reset_erhaelt_fenster_cache(self):
         marker = os.path.join(self.handoff_dir, ".state-abcd1234.json")
         with open(marker, "w", encoding="utf-8") as f:
@@ -295,6 +307,66 @@ class TestSessionStart(unittest.TestCase):
             data = json.load(f)
         self.assertEqual(data["stage"], 0)
         self.assertEqual(data["window_detected"], 1_000_000)
+
+
+class TestManifesteUndFrontmatter(unittest.TestCase):
+    """Validiert Plugin-Manifeste und Skill-Frontmatter ohne externe Tools –
+    fängt u. a. den v1.4.0-Fehler (redundantes hooks-Feld) als Regression."""
+
+    ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+
+    def test_plugin_json_valide_und_ohne_hooks_feld(self):
+        with open(
+            os.path.join(self.ROOT, ".claude-plugin", "plugin.json"), encoding="utf-8"
+        ) as f:
+            manifest = json.load(f)
+        self.assertTrue(manifest.get("name"))
+        self.assertTrue(manifest.get("description"))
+        self.assertTrue(manifest.get("version"))
+        # v1.4.0-Regression: hooks/hooks.json ist der Default-Ort – eine
+        # zusätzliche Manifest-Referenz erzeugt doppelte Registrierung.
+        self.assertNotIn("hooks", manifest)
+
+    def test_marketplace_json_valide(self):
+        with open(
+            os.path.join(self.ROOT, ".claude-plugin", "marketplace.json"), encoding="utf-8"
+        ) as f:
+            mp = json.load(f)
+        self.assertTrue(mp.get("name"))
+        self.assertTrue(mp.get("description"))
+        self.assertEqual(len(mp.get("plugins", [])), 1)
+
+    def test_hooks_json_valide(self):
+        with open(os.path.join(self.ROOT, "hooks", "hooks.json"), encoding="utf-8") as f:
+            hooks = json.load(f)
+        self.assertIn("Stop", hooks["hooks"])
+        self.assertIn("SessionStart", hooks["hooks"])
+        matcher = hooks["hooks"]["SessionStart"][0]["matcher"]
+        for source in ("startup", "resume", "clear", "compact", "fork"):
+            self.assertIn(source, matcher)
+
+    def test_alle_skills_haben_gueltige_frontmatter(self):
+        skills_dir = os.path.join(self.ROOT, "skills")
+        gefunden = 0
+        for skill in sorted(os.listdir(skills_dir)):
+            path = os.path.join(skills_dir, skill, "SKILL.md")
+            if not os.path.isfile(path):
+                continue
+            gefunden += 1
+            with open(path, encoding="utf-8") as f:
+                lines = f.read().splitlines()
+            self.assertEqual(lines[0].strip(), "---", f"{skill}: Frontmatter-Beginn fehlt")
+            ende = lines[1:].index("---") + 1
+            frontmatter = {}
+            for line in lines[1:ende]:
+                self.assertRegex(
+                    line, r"^[a-z-]+: \S", f"{skill}: ungültige Frontmatter-Zeile: {line!r}"
+                )
+                key, _, value = line.partition(": ")
+                frontmatter[key] = value
+            self.assertEqual(frontmatter.get("name"), skill, f"{skill}: name-Feld")
+            self.assertTrue(frontmatter.get("description"), f"{skill}: description fehlt")
+        self.assertEqual(gefunden, 4)
 
 
 if __name__ == "__main__":

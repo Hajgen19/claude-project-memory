@@ -34,7 +34,7 @@ claude plugin install project-memory@claude-project-memory
 claude plugin details project-memory@claude-project-memory
 ```
 
-Erwartung: `Skills (3)`, `Hooks (2) Stop, SessionStart`, korrekte Versionsnummer.
+Erwartung: `Skills (4) doctor, handoff, knowledge-base-entry, memory-init`, `Hooks (2) Stop, SessionStart`, korrekte Versionsnummer.
 
 ## 4. End-to-End: Feuert der Wächter und handelt das Modell?
 

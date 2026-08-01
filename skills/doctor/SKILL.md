@@ -32,13 +32,17 @@ Eine Testdatei `tmp/handoff/.doctor-write-test` anlegen und sofort wieder lösch
 
 ## Prüfung 6: Funktioniert die komplette Hook-Kette? (Lebendtest)
 
-Den Wächter einmal direkt mit synthetischem Payload aufrufen – `<PLUGIN_ROOT>` ist der Plugin-Root aus dem Base-directory-Hinweis, `<TRANSCRIPT>` ein beliebiges existierendes Transcript (z. B. das jüngste unter `~/.claude/projects/<projekt-slug>/*.jsonl`):
+Den Wächter einmal direkt mit synthetischem Payload aufrufen. **Wichtig: Den Payload NICHT per `echo` inline übergeben** – Shells zerlegen die JSON-Klammern und Anführungszeichen (Bash: Brace Expansion und Quote-Stripping; PowerShell: eigenes Parsing). Stattdessen: Payload als Datei schreiben, dann pipen.
 
-```
-echo {"session_id":"doctor01","transcript_path":"<TRANSCRIPT>","cwd":"<PROJEKT>","hook_event_name":"Stop","stop_hook_active":false} | python <PLUGIN_ROOT>/hooks/context_guard.py
+1. Mit dem Write-Tool eine Datei `tmp/handoff/.doctor-payload.json` anlegen – Inhalt (Pfade einsetzen; `<PLUGIN_ROOT>` aus dem Base-directory-Hinweis, `<TRANSCRIPT>` ein existierendes Transcript, z. B. das jüngste unter `~/.claude/projects/<projekt-slug>/*.jsonl`):
+
+```json
+{"session_id":"doctor01","transcript_path":"<TRANSCRIPT>","cwd":"<PROJEKT>","hook_event_name":"Stop","stop_hook_active":false}
 ```
 
-Erwartung: Exit 0, und danach existiert `tmp/handoff/.state-doctor01.json` (anschließend wieder löschen). Entsteht der Marker nicht, obwohl Python läuft: Transcript-Format-Problem (Claude-Code-Update könnte die JSONL-Struktur geändert haben) – das ist die bekannte Wartungs-Hypothek, Issue im Plugin-Repo aufmachen.
+2. Die Datei an den Hook pipen – Bash/sh: `python "<PLUGIN_ROOT>/hooks/context_guard.py" < tmp/handoff/.doctor-payload.json` · PowerShell: `Get-Content tmp/handoff/.doctor-payload.json | python "<PLUGIN_ROOT>/hooks/context_guard.py"`
+
+Erwartung: Exit 0, und danach existiert `tmp/handoff/.state-doctor01.json` (Payload- und State-Datei anschließend wieder löschen). Entsteht der Marker nicht, obwohl Python läuft: Transcript-Format-Problem (Claude-Code-Update könnte die JSONL-Struktur geändert haben) – das ist die bekannte Wartungs-Hypothek, Issue im Plugin-Repo aufmachen.
 
 ## Prüfung 7: Bestandsübersicht (Info, kein Fehler)
 
