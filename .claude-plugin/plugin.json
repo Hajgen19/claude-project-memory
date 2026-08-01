@@ -1,0 +1,10 @@
+{
+  "name": "project-memory",
+  "description": "Projektgedaechtnis fuer jedes Claude-Code-Projekt: Kontext-Waechter sichert den Arbeitsstand, bevor er verloren geht (Changelog, Handoff, Learnings), und speist ihn in neue Sessions zurueck.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Hajgen19",
+    "url": "https://github.com/Hajgen19"
+  },
+  "hooks": "./hooks/hooks.json"
+}

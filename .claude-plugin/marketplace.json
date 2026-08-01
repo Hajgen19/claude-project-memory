@@ -1,0 +1,14 @@
+{
+  "name": "claude-project-memory",
+  "owner": {
+    "name": "Hajgen19",
+    "url": "https://github.com/Hajgen19"
+  },
+  "plugins": [
+    {
+      "name": "project-memory",
+      "source": "./",
+      "description": "Projektgedaechtnis: Kontext-Waechter (25/60/85 %), Session-Handoff, Changelog-Konvention, Learnings-Datenbank."
+    }
+  ]
+}

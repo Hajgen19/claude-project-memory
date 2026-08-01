@@ -1,0 +1,8 @@
+# Python
+__pycache__/
+*.pyc
+
+# OS-Artefakte
+.DS_Store
+Thumbs.db
+desktop.ini
