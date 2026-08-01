@@ -45,6 +45,18 @@ Nach einer Kompaktierung sind alle Stufen automatisch wieder scharf (neuer Zyklu
 | `handoff` | `/project-memory:handoff` | Manuelle Session-Übergabe nach `tmp/handoff/`, jederzeit. |
 | `knowledge-base-entry` | `/project-memory:knowledge-base-entry` oder „neues Learning" | Strukturierter Eintrag in die Wissensdatenbank (Symptom → Root Cause → Fix → Tags), formaterhaltend, mit Volltext-Suche per Symptom-Wortlaut. |
 
+## ⚠️ Voraussetzung: Python 3 – ohne läuft hier NICHTS
+
+Beide Hooks sind Python-Skripte und rufen `python` auf. **Ohne erreichbares `python`-Kommando ist das Plugin vollständig stumm – empirisch verifiziert: kein Fehler, keine Warnung, keine Dateien.** Es sieht installiert aus (`/plugin list` zeigt es), aber Wächter und Sessionstart-Einspeisung existieren praktisch nicht. Du merkst es erst, wenn nach einer Kompaktierung der Stand fehlt – also genau im Schadensfall.
+
+**Deshalb VOR der Installation einmal prüfen:**
+
+```
+python --version
+```
+
+Kommt `Python 3.x` zurück: alles gut. Kommt ein Fehler (häufig auf macOS/Linux, wo nur `python3` existiert): Alias oder Symlink `python` → `python3` anlegen, oder Homebrew-Python nutzen (liefert `python` mit). Der Selbsttest in `memory-init` prüft das später ebenfalls – aber der Ein-Sekunden-Check jetzt erspart dir einen stillen Blindflug.
+
 ## Installation
 
 ```
@@ -64,7 +76,7 @@ Der Init-Schritt ist wichtig: Er trägt die Learnings-Dateinamen in die `.gitign
 
 ## Voraussetzungen & Konfiguration
 
-- **Python 3.x** – die beiden Hooks sind Python-Skripte (nur Standardbibliothek). Sie rufen `python` auf; auf macOS/Linux-Systemen, die nur `python3` kennen, bleibt der Wächter sonst still – Abhilfe: Alias oder Symlink `python` → `python3` anlegen, oder Homebrew-Python nutzen (liefert `python` mit). Fehlt Python ganz, bleibt das Plugin still – die Session funktioniert normal, nur ohne Sicherheitsnetz; der Selbsttest in `memory-init` deckt das auf.
+- **Python 3.x** – siehe den Voraussetzungs-Block oben: ohne `python`-Kommando ist das Plugin komplett stumm (nur Standardbibliothek, keine pip-Pakete nötig). Der Selbsttest in `memory-init` deckt einen stillen Ausfall nachträglich auf.
 - **Kontextfenster – mit Auto-Erkennung (v1.1):** Der Wächter rechnet gegen `CLAUDE_CONTEXT_WINDOW` (Default `200000`; alle Snippets unten gehören in die Datei `.claude/settings.json` im Projekt) und korrigiert sich selbst: Übersteigen die *gemessenen* Tokens das angenommene Fenster, ist das Fenster beweisbar größer – der Wächter schaltet auf `1000000` um und merkt sich das für den Rest der Session (überlebt auch Kompaktierungen). Trägt die Modell-ID im Transcript eine `[1m]`-Kennung, greift die Umschaltung sofort. Der explizite Eintrag in der Projekt-`settings.json` bleibt trotzdem empfohlen (macht `memory-init` auf Wunsch), denn er stimmt von der ersten Antwort an – die Beweis-Erkennung greift naturgemäß erst, sobald 200k überschritten sind; bis dahin kämen die Zwischenrufe in einer 1M-Session zu früh:
 
 ```json
