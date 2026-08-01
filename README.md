@@ -21,8 +21,8 @@ Faustregel: **Interessiert es in einem Jahr noch jemanden → Changelog. Interes
 
 | Schwelle | Auftrag |
 |---|---|
-| **25 %** | Changelog-Check – nur falls die heutige Tagesdatei in dieser Session noch unberührt ist |
-| **60 %** | Übergabedokument schreiben + Changelog nachziehen + Learnings prüfen |
+| **25 %** | Changelog-Check + Learning-Frühprüfung – nur falls die heutige Tagesdatei in dieser Session noch unberührt ist |
+| **60 %** | Übergabedokument schreiben + Changelog nachziehen + Learnings prüfen (zweites Netz) |
 | **85 %** | Übergabedokument auf den letzten Stand bringen – kurz bevor kompaktiert wird |
 
 Nach einer Kompaktierung sind alle Stufen automatisch wieder scharf (neuer Zyklus, erkannt am compact-Event und zusätzlich am Token-Einbruch).

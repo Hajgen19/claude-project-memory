@@ -211,16 +211,21 @@ def build_reason(stage, pct, tokens, window, handoff_file, today):
     )
     if stage == 1:
         return (
-            f"{kopf} Kurzer Changelog-Check, einmal pro Session:\n\n"
-            f"Liegen in dieser Session bereits ABGESCHLOSSENE Ergebnisse vor, die im "
-            "Changelog des Projekts noch fehlen? Falls ja, trage sie jetzt ein. "
-            "Maßgeblich ist die Changelog-Konvention des Projekts (CLAUDE.md); hat das "
-            f"Projekt keine, gilt der Standard changelog/{today}.md (Datei bei Bedarf "
+            f"{kopf} Kurzer Gedächtnis-Check, einmal pro Session:\n\n"
+            f"1. CHANGELOG: Liegen in dieser Session bereits ABGESCHLOSSENE Ergebnisse "
+            "vor, die im Changelog des Projekts noch fehlen? Falls ja, trage sie jetzt "
+            "ein. Maßgeblich ist die Changelog-Konvention des Projekts (CLAUDE.md); hat "
+            f"das Projekt keine, gilt der Standard changelog/{today}.md (Datei bei Bedarf "
             f"anlegen; Überschrift '# {today} – Kurztitel', Einträge knapp und thematisch "
             "gruppiert, nur Fakten im Perfekt – nichts Halbfertiges). Lege KEINE zweite "
-            "Changelog-Struktur an, wenn bereits eine andere existiert. "
-            "Falls es noch nichts einzutragen gibt, beende deinen Turn einfach normal, "
-            "ohne das dem User gegenüber zu erwähnen."
+            "Changelog-Struktur an, wenn bereits eine andere existiert.\n\n"
+            "2. LEARNINGS: Wurde in dieser Session bereits ein technisches Problem "
+            "gelöst, auf das alle vier Learning-Kriterien zutreffen (mehr als ein "
+            "Anlauf; Ursache nicht aus der Fehlermeldung ablesbar; wiederholbar; Lösung "
+            "nicht trivial)? Falls ja, schlage dem User einen Eintrag über den "
+            "knowledge-base-entry-Skill des project-memory-Plugins vor.\n\n"
+            "Trifft beides nicht zu, beende deinen Turn einfach normal, ohne das dem "
+            "User gegenüber zu erwähnen."
         )
     if stage == 2:
         return (
