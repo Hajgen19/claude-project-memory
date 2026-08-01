@@ -88,6 +88,24 @@ def read_context_tokens(transcript_path):
     return None, None
 
 
+def resolve_stages(env_value):
+    """Schwellen aus CLAUDE_MEMORY_STAGES ("25,60,85") – oder die Defaults.
+
+    Erwartet genau drei Prozentwerte, wird aufsteigend sortiert. Bei allem,
+    was keine drei sauberen Werte zwischen 0 und 100 ergibt, gelten die
+    Defaults – eine kaputte Konfiguration darf den Wächter nicht lahmlegen.
+    """
+    if not env_value:
+        return STAGE1_PCT, STAGE2_PCT, STAGE3_PCT
+    try:
+        parts = sorted(float(x.strip()) for x in env_value.split(","))
+    except ValueError:
+        return STAGE1_PCT, STAGE2_PCT, STAGE3_PCT
+    if len(parts) != 3 or not (0 < parts[0] < parts[1] < parts[2] <= 100):
+        return STAGE1_PCT, STAGE2_PCT, STAGE3_PCT
+    return parts[0], parts[1], parts[2]
+
+
 def resolve_window(env_value, cached_window, tokens, model):
     """Effektives Kontextfenster bestimmen (v1.1: Auto-Erkennung).
 
@@ -292,6 +310,7 @@ def main():
         os.environ.get("CLAUDE_CONTEXT_WINDOW"), cached_window, tokens, model
     )
     pct = tokens * 100.0 / window
+    s1, s2, s3 = resolve_stages(os.environ.get("CLAUDE_MEMORY_STAGES"))
 
     # Kompaktierung erkennen: Fällt der Verbrauch deutlich unter den beim
     # letzten Lauf gemessenen Stand, beginnt ein neuer Zyklus – Stufen wieder
@@ -303,11 +322,11 @@ def main():
     new_stage = None
     if observe_only:
         pass  # nur messen, Marker aktualisieren – keine Stufe zünden
-    elif pct >= STAGE3_PCT and stage < 3:
+    elif pct >= s3 and stage < 3:
         new_stage = 3
-    elif pct >= STAGE2_PCT and stage < 2:
+    elif pct >= s2 and stage < 2:
         new_stage = 2
-    elif pct >= STAGE1_PCT and stage < 1:
+    elif pct >= s1 and stage < 1:
         # Changelog-Check nur, wenn die Tagesdatei diese Session noch nicht sah;
         # sonst Stufe still als erledigt markieren.
         if changelog_untouched(project, transcript, today):

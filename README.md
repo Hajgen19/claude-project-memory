@@ -65,6 +65,18 @@ Der Init-Schritt ist wichtig: Er trägt `tmp/handoff/` und die Learnings-Dateina
 }
 ```
 
+- **Schwellen anpassen (v1.2):** Die drei Stufen behalten ihre feste Bedeutung (1 = Gedächtnis-Check, 2 = Erst-Handoff, 3 = Handoff-Update), aber ihre Prozentwerte sind über `CLAUDE_MEMORY_STAGES` frei wählbar – drei kommagetrennte Werte, aufsteigend:
+
+```json
+{
+  "env": {
+    "CLAUDE_MEMORY_STAGES": "20,50,80"
+  }
+}
+```
+
+Ungültige Angaben (falsche Anzahl, Werte außerhalb 0–100, doppelte Werte) fallen still auf die Defaults `25,60,85` zurück. Wer Stufe 3 näher an die Kompaktierung legt (z. B. `90`), riskiert, dass eine einzige lange Antwort darüber hinwegträgt und das letzte Update ausfällt – die 85 sind bewusst als Puffer gewählt.
+
 - Die Hooks enden in **jedem** Fehlerfall mit Exit 0 – ein kaputter Wächter darf niemals die Session stören.
 
 ## Grenzen, ehrlich benannt

@@ -102,6 +102,8 @@ Der Kontext-Wächter rechnet gegen `CLAUDE_CONTEXT_WINDOW` (Default `200000`) un
 }
 ```
 
+Erwähne dabei in einem Satz, dass auch die drei Wächter-Schwellen anpassbar sind (`CLAUDE_MEMORY_STAGES`, z. B. `"20,50,80"`; Default `25,60,85`) – aber nur eintragen, wenn der User es ausdrücklich möchte. Die Defaults sind bewusst gewählt (insb. der 85er-Puffer vor der Kompaktierung).
+
 ## Schritt 6: Abschlussbericht
 
 Kompakt melden: was geändert wurde (mit Pfaden), was übersprungen wurde und warum, und die drei Kommandos, die der User ab jetzt kennt:
