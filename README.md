@@ -2,7 +2,7 @@
 
 Projektgedächtnis für jedes Claude-Code-Projekt – als Plugin, das sich an **bestehende** Projekte andockt, egal ob Code, Content oder Beratung. Es sichert den Arbeitsstand, *bevor* er im Kontextfenster verloren geht, und speist ihn in neue Sessions zurück.
 
-Das Kernproblem, das es löst: Wenn eine Claude-Code-Session lang wird, kompaktiert die CLI den Kontext – verlustbehaftet. Entscheidungen, verworfene Ansätze und der aktuelle Zwischenstand sind danach weg. Dieses Plugin misst den **echten Tokenverbrauch** aus dem Session-Transcript und rettet den Stand rechtzeitig in Dateien, die jede Kompaktierung und jede Session-Grenze überleben.
+Das Kernproblem, das es löst: Das Kontextfenster ist das begrenzte Arbeitsgedächtnis des Modells. Läuft es voll, ersetzt Claude Code die bisherige Konversation automatisch durch eine Zusammenfassung („Kompaktierung") – dabei gehen Details verloren: Entscheidungen, verworfene Ansätze, der aktuelle Zwischenstand. Dieses Plugin misst den **echten Tokenverbrauch** aus dem Session-Transcript und rettet den Stand rechtzeitig in Dateien, die jede Kompaktierung und jede Session-Grenze überleben.
 
 ## Das Vier-Ebenen-Modell
 
@@ -10,12 +10,16 @@ Das Kernproblem, das es löst: Wenn eine Claude-Code-Session lang wird, kompakti
 |---|---|---|---|
 | `changelog/YYYY-MM-DD.md` | Was wurde wann getan? | permanent, append-only | ja |
 | `tmp/handoff/` | Wo steht die Arbeit gerade? | eine Session-Grenze | nein (gitignored) |
-| `docs/LEARNINGS.md` | Dieses Symptom gab es schon – was war die Ursache? | permanent, Nachschlagewerk | nein (gitignored) |
+| `docs/LEARNINGS.md` * | Dieses Symptom gab es schon – was war die Ursache? | permanent, Nachschlagewerk | nein (gitignored) |
 | CLAUDE.md-Sektion (optional) | Konventionen, die das Modell proaktiv kennt | permanent | ja |
+
+\* oder eine der anderen Pfad-Varianten, die der `knowledge-base-entry`-Skill erkennt (`LEARNINGS.md`, `KNOWLEDGE.md`, `KNOWLEDGE-BASE.md`, jeweils auch im Root).
 
 Faustregel: **Interessiert es in einem Jahr noch jemanden → Changelog. Interessiert es nur die nächste Session → Handoff. Ist es ein gelöstes technisches Problem → Learnings.**
 
 ## Wie es arbeitet
+
+Beide Automatiken sind **Hooks** – kleine Python-Skripte, die Claude Code selbst bei bestimmten Ereignissen ausführt: eins nach jeder Antwort (Stop), eins beim Sessionstart.
 
 **Kontext-Wächter** (Stop-Hook): Misst nach jeder Antwort die tatsächliche Kontextfüllung (input + cache-read + cache-creation aus dem Transcript – gemessen, nicht geschätzt) und stößt gestuft an, je einmal pro Session und Stufe:
 
@@ -25,9 +29,13 @@ Faustregel: **Interessiert es in einem Jahr noch jemanden → Changelog. Interes
 | **60 %** | Übergabedokument schreiben + Changelog nachziehen + Learnings prüfen (zweites Netz) |
 | **85 %** | Übergabedokument auf den letzten Stand bringen – kurz bevor kompaktiert wird |
 
+**Wer führt die Aufträge aus?** Der Wächter unterbricht kurz das Antwort-Ende und gibt Claude den Auftrag als Anweisung mit – Claude schreibt Changelog und Übergabedokument dann selbst, für dich sichtbar im Chat. Du musst nichts tun, kannst aber jederzeit eingreifen. Ein Zwischenruf sieht so aus:
+
+> *[project-memory · Kontext-Wächter] Diese Session hat 62 % des Kontextfensters erreicht (124.000 von 200.000 Tokens). Sichere jetzt den Stand, bevor du weiterarbeitest: 1. HANDOFF: …*
+
 Nach einer Kompaktierung sind alle Stufen automatisch wieder scharf (neuer Zyklus, erkannt am compact-Event und zusätzlich am Token-Einbruch).
 
-**Sessionstart-Hook**: Lädt beim Start, nach `/clear` und nach jeder Kompaktierung das jüngste Übergabedokument (nach Kompaktierung bevorzugt das der eigenen Session – parallele Sessions im selben Projekt kommen sich nicht in die Quere) und den Schnell-Lookup-Index der Learnings-Datenbank in den frischen Kontext. Die neue Session weiß sofort, wo die letzte aufgehört hat und welche Probleme schon gelöst wurden.
+**Sessionstart-Hook**: Lädt beim Start, nach `/clear` und nach jeder Kompaktierung das jüngste Übergabedokument (nach Kompaktierung bevorzugt das der eigenen Session – parallele Sessions im selben Projekt kommen sich nicht in die Quere) und die Symptom-Kurzübersicht der Learnings-Datenbank in den frischen Kontext. Die neue Session weiß sofort, wo die letzte aufgehört hat und welche Probleme schon gelöst wurden. Wurde `memory-init` im Projekt noch nie ausgeführt, erinnert der Hook außerdem einmal pro Session daran.
 
 **Skills:**
 
@@ -44,18 +52,20 @@ Nach einer Kompaktierung sind alle Stufen automatisch wieder scharf (neuer Zyklu
 /plugin install project-memory@claude-project-memory
 ```
 
+**Wichtig zu wissen:** Ab diesem Moment ist der Wächter in **jedem** deiner Projekte aktiv – er misst still mit und legt beim ersten Antwort-Ende den Ordner `tmp/handoff/` an (mit einer kleinen Statusdatei, dem „Marker", und einer eigenen `.gitignore`, die den Ordner komplett vor Commits schützt). Mehr passiert ohne dein Zutun nicht.
+
 Danach im jeweiligen Projekt einmalig andocken:
 
 ```
 /project-memory:memory-init
 ```
 
-Der Init-Schritt ist wichtig: Er trägt `tmp/handoff/` und die Learnings-Dateinamen in die `.gitignore` ein (sonst landen Übergabedokumente und persönliche Notizen im Repo), startet die Changelog-Konvention und bietet an, die Konventionen in der CLAUDE.md zu verankern. Jeder Schritt zeigt vor dem Schreiben ein Diff – nichts wird ungefragt geändert.
+Der Init-Schritt ist wichtig: Er trägt die Learnings-Dateinamen in die `.gitignore` ein (sonst landet deine persönliche Wissensdatenbank im Repo), startet die Changelog-Konvention, prüft, ob die Hooks wirklich laufen, und bietet an, die Konventionen in der CLAUDE.md zu verankern. Jeder Schritt zeigt vor dem Schreiben ein Diff – nichts wird ungefragt geändert. Vergisst du den Schritt, erinnert dich das Plugin beim nächsten Sessionstart daran.
 
 ## Voraussetzungen & Konfiguration
 
-- **Python 3.x** – die beiden Hooks sind Python-Skripte (nur Standardbibliothek). Sie rufen `python` auf; auf macOS/Linux-Systemen, die nur `python3` kennen, hilft der Hinweis-Abschnitt in `memory-init` (Alias/Homebrew). Fehlt Python, bleibt das Plugin still – die Session funktioniert normal, nur ohne Sicherheitsnetz.
-- **Kontextfenster – mit Auto-Erkennung (v1.1):** Der Wächter rechnet gegen `CLAUDE_CONTEXT_WINDOW` (Default `200000`) und korrigiert sich selbst: Übersteigen die *gemessenen* Tokens das angenommene Fenster, ist das Fenster beweisbar größer – der Wächter schaltet auf `1000000` um und merkt sich das für den Rest der Session (überlebt auch Kompaktierungen). Trägt die Modell-ID im Transcript eine `[1m]`-Kennung, greift die Umschaltung sofort. Der explizite Eintrag in der Projekt-`settings.json` bleibt trotzdem empfohlen (macht `memory-init` auf Wunsch), denn er stimmt von der ersten Antwort an – die Beweis-Erkennung greift naturgemäß erst, sobald 200k überschritten sind; bis dahin kämen die Zwischenrufe in einer 1M-Session zu früh:
+- **Python 3.x** – die beiden Hooks sind Python-Skripte (nur Standardbibliothek). Sie rufen `python` auf; auf macOS/Linux-Systemen, die nur `python3` kennen, bleibt der Wächter sonst still – Abhilfe: Alias oder Symlink `python` → `python3` anlegen, oder Homebrew-Python nutzen (liefert `python` mit). Fehlt Python ganz, bleibt das Plugin still – die Session funktioniert normal, nur ohne Sicherheitsnetz; der Selbsttest in `memory-init` deckt das auf.
+- **Kontextfenster – mit Auto-Erkennung (v1.1):** Der Wächter rechnet gegen `CLAUDE_CONTEXT_WINDOW` (Default `200000`; alle Snippets unten gehören in die Datei `.claude/settings.json` im Projekt) und korrigiert sich selbst: Übersteigen die *gemessenen* Tokens das angenommene Fenster, ist das Fenster beweisbar größer – der Wächter schaltet auf `1000000` um und merkt sich das für den Rest der Session (überlebt auch Kompaktierungen). Trägt die Modell-ID im Transcript eine `[1m]`-Kennung, greift die Umschaltung sofort. Der explizite Eintrag in der Projekt-`settings.json` bleibt trotzdem empfohlen (macht `memory-init` auf Wunsch), denn er stimmt von der ersten Antwort an – die Beweis-Erkennung greift naturgemäß erst, sobald 200k überschritten sind; bis dahin kämen die Zwischenrufe in einer 1M-Session zu früh:
 
 ```json
 {
@@ -81,14 +91,14 @@ Ungültige Angaben (falsche Anzahl, Werte außerhalb 0–100, doppelte Werte) fa
 
 ## Grenzen, ehrlich benannt
 
-- **`memory-init` direkt nach der Installation ausführen.** Der Wächter ist ab der Installation in jedem Projekt aktiv; der Handoff-Ordner schützt sich zwar selbst vor Commits (er legt eine eigene `.gitignore` mit `*` an), aber die Learnings-Absicherung und die Konventions-Abstimmung kommen erst mit dem Init.
+- **`memory-init` direkt nach der Installation ausführen.** Der Handoff-Ordner schützt sich zwar selbst vor Commits, aber die Learnings-Absicherung und die Konventions-Abstimmung kommen erst mit dem Init. Der Sessionstart-Reminder fängt Vergessliche auf.
 - **Projekte, deren Build `tmp/` leert** (Clean-Tasks): Ein solcher Task löscht auch Übergabedokumente und Wächter-Marker. `memory-init` warnt in dem Fall; die Abhilfe ist, den Clean-Task `tmp/handoff/` verschonen zu lassen.
 - **Sessions, die unter 25 % bleiben,** bekommen keinen automatischen Anstoß – dort trägt die Konvention aus der CLAUDE.md-Sektion (oder ein manuelles `/project-memory:handoff`).
-- **Eigene Changelog-Konventionen werden respektiert:** Der Wächter verweist auf die Konvention der Projekt-CLAUDE.md und legt keine zweite Struktur an; der Datei-Check der 25-%-Stufe kennt allerdings nur das Standard-Schema `changelog/YYYY-MM-DD.md` – bei abweichender Konvention kommt der Zwischenruf daher maximal einmal pro Session, auch wenn schon eingetragen wurde.
+- **Eigene Changelog-Konventionen werden respektiert:** Der Wächter verweist auf die Konvention der Projekt-CLAUDE.md und legt keine zweite Struktur an. Nutzt dein Projekt aber ein anderes Changelog-Format als `changelog/YYYY-MM-DD.md`, kann die 25-%-Stufe nicht erkennen, ob du schon eingetragen hast – sie erinnert dann einmal pro Session, auch wenn alles erledigt ist. Harmlos, nur redundant.
 
 ## Was es bewusst NICHT tut
 
-- Es schreibt nie ungefragt in `CLAUDE.md`, `.gitignore` oder andere Projektdateien – das macht nur `memory-init`, mit Diff und Bestätigung.
+- Es ändert nie ungefragt **bestehende** Projektdateien (`CLAUDE.md`, deine `.gitignore`, deinen Code) – das macht nur `memory-init`, mit Diff und Bestätigung. Seine **eigenen** Ablagen (`tmp/handoff/` samt Marker; Changelog- und Handoff-Einträge, die Claude sichtbar im Chat schreibt) legt es dagegen automatisch an.
 - Es sendet nichts nach außen. Alle Daten bleiben im Projektordner.
 - Die Learnings-Datenbank wandert nie ins Repo – sie gehört dem jeweiligen Nutzer.
 - Es ersetzt keine Projektdokumentation. Handoffs sind bewusst flüchtig; was dauerhaft zählt, gehört ins Changelog oder in die Doku.

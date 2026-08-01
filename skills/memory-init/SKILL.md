@@ -28,7 +28,7 @@ Prüfe und berichte kompakt:
 5. Läuft `python --version` (Python 3.x)? Falls das Kommando `python` fehlt, aber `python3 --version` funktioniert: den Hinweis aus dem Abschnitt „Python-Kommando" unten geben.
 6. Ist das Projekt ein Git-Repository? (Falls nein: Schritt 2 entfällt inhaltlich, trotzdem anlegen – schadet nicht und schützt, falls später `git init` kommt.)
 7. **Wird `tmp/` vom Projekt anderweitig genutzt** (Build-Output, Clean-Tasks wie `rimraf tmp`)? Falls ja, den User warnen: Ein Clean-Task, der `tmp/` leert, löscht auch Übergabedokumente und Wächter-Marker mitten in der Session. Empfehlung dann: Clean-Task auf Unterordner einschränken, die `tmp/handoff/` verschonen.
-8. **Liegen bereits Dateien unter `tmp/handoff/` und sind welche davon git-getrackt** (`git ls-files tmp/handoff/`)? Das kann passieren, wenn zwischen Plugin-Installation und diesem Init bereits Sessions liefen. Getrackte Handoff-/Marker-Dateien explizit melden; Abhilfe `git rm --cached <datei>` nennen, aber NICHT ungefragt ausführen.
+8. **Hook-Selbsttest:** Liefen seit der Plugin-Installation bereits Sessions mit Antworten in diesem Projekt, muss `tmp/handoff/` eine `.state-*.json` enthalten (der Wächter schreibt sie bei JEDEM Antwort-Ende). Fehlt sie trotz gelaufener Antworten, ist der Wächter beweisbar nicht aktiv – häufigste Ursache: `python`-Kommando fehlt (siehe Abschnitt „Python-Kommando"). Ergebnis im Abschlussbericht nennen. Zusätzlich: **Liegen bereits Dateien unter `tmp/handoff/` und sind welche davon git-getrackt** (`git ls-files tmp/handoff/`)? Das kann passieren, wenn zwischen Plugin-Installation und diesem Init bereits Sessions liefen. Getrackte Handoff-/Marker-Dateien explizit melden; Abhilfe `git rm --cached <datei>` nennen, aber NICHT ungefragt ausführen.
 
 ## Schritt 2: .gitignore ergänzen (Pflicht)
 
@@ -50,7 +50,7 @@ docs/KNOWLEDGE.md
 docs/KNOWLEDGE-BASE.md
 ```
 
-**Vor dem Schreiben:** Prüfe mit `git ls-files`, ob eine der Learnings-Kandidaten-Dateien bereits committet ist. Falls ja, FRAGE den User, ob es sich um eine **geteilte Team-Datei** handelt (z. B. eine gepflegte `docs/KNOWLEDGE.md` als Projektdoku): Team-Dateien werden NICHT ignoriert und NICHT aus dem Repo entfernt – der entsprechende Dateiname wird dann aus dem gitignore-Block gestrichen, und der `knowledge-base-entry`-Skill nutzt in diesem Projekt einen anderen der Kandidaten-Pfade. Nur für bestätigt **persönliche** Dateien gilt: warnen (ignorieren wirkt nicht auf bereits Getracktes) und `git rm --cached <datei>` als Abhilfe nennen, aber NICHT ungefragt ausführen.
+**Vor dem Schreiben:** Prüfe mit `git ls-files`, ob eine der Learnings-Kandidaten-Dateien bereits committet ist. Falls ja, FRAGE den User, ob es sich um eine **geteilte Team-Datei** handelt (z. B. eine gepflegte `docs/KNOWLEDGE.md` als Projektdoku): Team-Dateien werden NICHT ignoriert und NICHT aus dem Repo entfernt – der entsprechende Dateiname wird dann aus dem gitignore-Block gestrichen. **Damit die persönliche Datenbank nicht in der Team-Datei landet, die Entscheidung sofort persistieren:** Die persönliche Learnings-Datei an einem ANDEREN Kandidaten-Pfad mit höherer Priorität anlegen (z. B. `docs/LEARNINGS.md`, Skelett aus der TEMPLATE.md des knowledge-base-entry-Skills) – dann finden Skill und Sessionstart-Hook automatisch die richtige Datei, ohne weitere Konfiguration. Nur für bestätigt **persönliche** Dateien gilt: warnen (ignorieren wirkt nicht auf bereits Getracktes) und `git rm --cached <datei>` als Abhilfe nennen, aber NICHT ungefragt ausführen.
 
 Danach: Diff zeigen, Bestätigung abwarten, dann schreiben.
 
@@ -66,7 +66,9 @@ Falls noch nicht vorhanden: Ordner `changelog/` anlegen und die heutige Tagesdat
 - project-memory-Plugin eingerichtet (memory-init): .gitignore ergänzt, Changelog-Konvention gestartet[, CLAUDE.md-Sektion ergänzt – je nach Schritt 4].
 ```
 
-Konvention (gilt ab jetzt): eine Datei pro Arbeitstag, `YYYY-MM-DD.md`, H1 `# YYYY-MM-DD – Kurztitel`, weitere Einträge desselben Tags werden angehängt, bestehende Tagesdateien nie rückwirkend verändert. Existiert bereits ein `changelog/`-Ordner mit anderem Format: das vorhandene Format übernehmen und NICHT umbauen – der Kontext-Wächter funktioniert mit jeder Tagesdatei-Konvention, solange der Dateiname `YYYY-MM-DD.md` ist.
+**Hat Schritt 1.2 eine bestehende ANDERE Changelog-Konvention gefunden (z. B. zentrale `CHANGELOG.md` ohne `changelog/`-Ordner): KEIN `changelog/` anlegen.** Die Bestands-Konvention wird übernommen, in der CLAUDE.md-Sektion (Schritt 4) als maßgeblich dokumentiert, und der Setup-Eintrag dieses Andockens landet in der Bestandsdatei. Den User auf die Einschränkung hinweisen: Der 25-%-Datei-Check kennt nur das Standard-Schema, der Zwischenruf kommt dann einmal pro Session, auch wenn schon eingetragen wurde – harmlos, nur redundant.
+
+Andernfalls Standard-Konvention (gilt ab jetzt): eine Datei pro Arbeitstag, `YYYY-MM-DD.md`, H1 `# YYYY-MM-DD – Kurztitel`, weitere Einträge desselben Tags werden angehängt, bestehende Tagesdateien nie rückwirkend verändert. Existiert bereits ein `changelog/`-Ordner mit anderem Format: das vorhandene Format übernehmen und NICHT umbauen – der Kontext-Wächter funktioniert mit jeder Tagesdatei-Konvention, solange der Dateiname `YYYY-MM-DD.md` ist.
 
 ## Schritt 4: CLAUDE.md-Sektion anbieten (empfohlen, Opt-in)
 
@@ -104,9 +106,11 @@ Der Kontext-Wächter rechnet gegen `CLAUDE_CONTEXT_WINDOW` (Default `200000`) un
 
 Erwähne dabei in einem Satz, dass auch die drei Wächter-Schwellen anpassbar sind (`CLAUDE_MEMORY_STAGES`, z. B. `"20,50,80"`; Default `25,60,85`) – aber nur eintragen, wenn der User es ausdrücklich möchte. Die Defaults sind bewusst gewählt (insb. der 85er-Puffer vor der Kompaktierung).
 
-## Schritt 6: Abschlussbericht
+## Schritt 6: Abschluss
 
-Kompakt melden: was geändert wurde (mit Pfaden), was übersprungen wurde und warum, und die drei Kommandos, die der User ab jetzt kennt:
+**Init-Marker schreiben (Pflicht):** Datei `tmp/handoff/.init-done` mit dem heutigen Datum als Inhalt anlegen (Ordner bei Bedarf inkl. `.gitignore` mit `*`). Der Sessionstart-Hook hört damit auf, an das Andocken zu erinnern.
+
+Dann kompakt melden: was geändert wurde (mit Pfaden), was übersprungen wurde und warum – plus zwei Pflicht-Informationen: (1) „Der Wächter meldet sich bei ca. 25/60/85 % Kontextfüllung mit dem Präfix `[project-memory · Kontext-Wächter]` – das ist dieses Plugin, kein Fehler" (bei angepassten Schwellen die tatsächlichen Werte nennen); (2) die Faustregel: *Interessiert es in einem Jahr noch jemanden → Changelog. Interessiert es nur die nächste Session → Handoff. Gelöstes technisches Problem → Learnings.* Dazu die Werkzeuge, die der User ab jetzt kennt:
 
 - `/project-memory:handoff` – manuelle Session-Übergabe
 - `/project-memory:knowledge-base-entry` bzw. „neues Learning" – Wissensdatenbank-Eintrag

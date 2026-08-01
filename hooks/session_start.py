@@ -191,6 +191,21 @@ def main():
     cleanup_state(project)
 
     parts = []
+    # Onboarding-Netz: Lief memory-init in diesem Projekt noch nie (keine
+    # Marker-Datei), bekommt das Modell einen Einzeiler mit – es erwähnt den
+    # fehlenden Schritt beim passenden Moment, statt dass er nur im README steht.
+    if source == "startup" and not os.path.isfile(
+        os.path.join(project, "tmp", "handoff", ".init-done")
+    ):
+        parts.append(
+            "## project-memory: Andocken steht aus\n\n"
+            "Das project-memory-Plugin ist aktiv (Kontext-Wächter läuft), aber "
+            "/project-memory:memory-init wurde in diesem Projekt noch nicht ausgeführt – "
+            "es fehlen also .gitignore-Absicherung der Learnings-Datenbank, "
+            "Changelog-Konvention und Kontextfenster-Konfiguration. Weise den User "
+            "bei passender Gelegenheit EINMAL kurz darauf hin (ein Satz genügt, "
+            "nicht wiederholen, nicht drängen)."
+        )
     started = session_start_time(payload.get("transcript_path")) if source == "compact" else None
     handoff = pick_handoff(project, session if source == "compact" else "", started)
     if handoff:

@@ -215,6 +215,15 @@ def ensure_state_dir(state_dir):
     if not os.path.isfile(gi):
         with open(gi, "w", encoding="utf-8") as f:
             f.write("*\n")
+    info = os.path.join(state_dir, "README.md")
+    if not os.path.isfile(info):
+        with open(info, "w", encoding="utf-8") as f:
+            f.write(
+                "# tmp/handoff/\n\n"
+                "Angelegt vom project-memory-Plugin: Session-Übergabedokumente und\n"
+                "Wächter-Marker. Bleibt per eigener .gitignore lokal, ist gefahrlos\n"
+                "löschbar. Doku: https://github.com/Hajgen19/claude-project-memory\n"
+            )
 
 
 def de_number(n):
@@ -224,8 +233,14 @@ def de_number(n):
 
 def build_reason(stage, pct, tokens, window, handoff_file, today):
     kopf = (
-        f"[Kontext-Wächter] Diese Session hat {pct:.0f} % des Kontextfensters erreicht "
-        f"({de_number(tokens)} von {de_number(window)} Tokens)."
+        f"[project-memory · Kontext-Wächter] Diese Session hat {pct:.0f} % des "
+        f"Kontextfensters erreicht ({de_number(tokens)} von {de_number(window)} Tokens)."
+    )
+    fuss = (
+        "\n\n(Automatischer Stop-Hook des project-memory-Plugins. Wenn du dabei etwas "
+        "schreibst, erwähne dem User kurz, dass die Sicherung vom Plugin kommt. Schwellen: "
+        "CLAUDE_MEMORY_STAGES, manueller Handoff: /project-memory:handoff, "
+        "deaktivieren: /plugin disable project-memory.)"
     )
     if stage == 1:
         return (
@@ -243,7 +258,7 @@ def build_reason(stage, pct, tokens, window, handoff_file, today):
             "nicht trivial)? Falls ja, schlage dem User einen Eintrag über den "
             "knowledge-base-entry-Skill des project-memory-Plugins vor.\n\n"
             "Trifft beides nicht zu, beende deinen Turn einfach normal, ohne das dem "
-            "User gegenüber zu erwähnen."
+            "User gegenüber zu erwähnen." + fuss
         )
     if stage == 2:
         return (
@@ -263,7 +278,7 @@ def build_reason(stage, pct, tokens, window, handoff_file, today):
             "der Fehlermeldung ablesbar; wiederholbar; Lösung nicht trivial)? Falls ja, "
             "schlage dem User einen Eintrag über den knowledge-base-entry-Skill des "
             "project-memory-Plugins vor. Falls nein, diesen Punkt kommentarlos überspringen.\n\n"
-            "Danach beende deinen Turn normal."
+            "Danach beende deinen Turn normal." + fuss
         )
     return (
         f"{kopf} Die Kompaktierung rückt näher – bring das Übergabedokument auf den letzten "
@@ -314,9 +329,13 @@ def main():
 
     # Kompaktierung erkennen: Fällt der Verbrauch deutlich unter den beim
     # letzten Lauf gemessenen Stand, beginnt ein neuer Zyklus – Stufen wieder
-    # freigeben. (Primär löscht session_start.py den Marker beim compact-Event;
-    # dieser Fallback greift, falls der Hook dort nicht lief.)
-    if stage > 0 and last_pct - pct > 25.0:
+    # freigeben. (Primär setzt session_start.py den Marker beim compact-Event
+    # zurück; dieser Fallback greift, falls der Hook dort nicht lief.)
+    # Ausnahme: Wurde das Fenster SOEBEN per Beweis hochgeschaltet (frische
+    # Erkennung, noch kein Cache), ist der pct-Einbruch nur die Umrechnung –
+    # keine Kompaktierung, Stufen bleiben verbraucht.
+    fresh_detection = detected and not cached_window
+    if stage > 0 and last_pct - pct > 25.0 and not fresh_detection:
         stage = 0
 
     new_stage = None
