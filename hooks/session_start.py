@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sessionstart (SessionStart-Hook, Matcher: startup|clear|compact).
+"""Sessionstart (SessionStart-Hook, Matcher: startup|resume|clear|compact|fork).
 
 Speist zwei Dinge in den frischen Kontext ein, sofern vorhanden:
 
@@ -14,7 +14,7 @@ Speist zwei Dinge in den frischen Kontext ein, sofern vorhanden:
 
 Nebenbei: Beim compact-Event wird der Stufen-Marker des Kontext-Wächters für
 diese Session zurückgesetzt (neuer Kompaktierungszyklus = Stufen wieder frei),
-und Marker älter als 7 Tage werden entsorgt. Fehler enden immer mit Exit 0 –
+und Marker älter als 14 Tage werden entsorgt. Fehler enden immer mit Exit 0 –
 ein kaputter Hook darf den Sessionstart niemals stören.
 """
 
@@ -22,13 +22,17 @@ import datetime
 import glob
 import json
 import os
+import re
 import sys
 import time
 
 MAX_HANDOFF_CHARS = 6_000
 MAX_LOOKUP_CHARS = 2_500
 HANDOFF_MAX_AGE_DAYS = 14
-STATE_MAX_AGE_DAYS = 7
+# An HANDOFF_MAX_AGE_DAYS angeglichen: Ein Marker darf nicht sterben, solange
+# seine Session noch resumbar ist – sonst feuern Stufen erneut und der
+# window_detected-Cache geht verloren (v1.5.3).
+STATE_MAX_AGE_DAYS = 14
 
 # Muss zur Suchreihenfolge des knowledge-base-entry-Skills passen (Schritt 1)
 KB_CANDIDATES = [
@@ -84,15 +88,51 @@ def session_start_time(transcript_path):
         return None
 
 
-def pick_handoff(project, session, session_started):
+def transcript_last_time(transcript_path):
+    """Epoch-Zeit der LETZTEN Transcript-Aktivität – oder None.
+
+    Begrenzt das Laufzeit-Fenster der Handoff-Auswahl nach oben: Bei einem
+    Resume nach Tagen endet die eigene Aktivität mit der letzten Zeile der
+    alten Session – alles, was danach entstand, stammt von anderen Sessions.
+    """
+    if not transcript_path:
+        return None
+    try:
+        with open(transcript_path, "rb") as f:
+            f.seek(0, os.SEEK_END)
+            size = f.tell()
+            f.seek(max(0, size - 64 * 1024))
+            lines = f.read().decode("utf-8", errors="replace").splitlines()
+        for line in reversed(lines):
+            if '"timestamp"' not in line:
+                continue
+            try:
+                ts = json.loads(line).get("timestamp")
+            except ValueError:
+                continue
+            if ts:
+                return datetime.datetime.fromisoformat(
+                    ts.replace("Z", "+00:00")
+                ).timestamp()
+    except (OSError, ValueError, TypeError):
+        pass
+    return None
+
+
+GUARD_NAME_RE = re.compile(r"^handoff-\d{4}-\d{2}-\d{2}-([0-9a-f]{8})\.md$")
+
+
+def pick_handoff(project, session, session_started, session_last=None):
     """(dateiname, alter_in_tagen, inhalt) des passendsten Handoffs – oder None.
 
-    Nach einer Kompaktierung (session gesetzt) gehören zwei Sorten Dateien zur
-    eigenen Session: die vom Kontext-Wächter angestoßenen (Session-Kurz-ID im
-    Namen) UND manuell per /handoff geschriebene (beliebiger Name, aber mtime
-    innerhalb der Session-Laufzeit). Beide bevorzugen – parallele Sessions im
-    selben Projekt dürfen den eigenen Stand nicht verdrängen, und ein frisches
-    manuelles Handoff darf nicht gegen ein älteres Wächter-Handoff verlieren.
+    Läuft die eigene Session weiter (compact/resume: session gesetzt), gehören
+    zwei Sorten Dateien zu ihr: die vom Kontext-Wächter angestoßenen
+    (Session-Kurz-ID im Namen) und manuell per /handoff geschriebene (freier
+    Name, aber mtime innerhalb der EIGENEN Laufzeit). Das Laufzeit-Fenster ist
+    beidseitig begrenzt (Start bis letzte eigene Transcript-Aktivität) und
+    schließt Wächter-Handoffs mit FREMDER Session-ID aus – sonst würde bei
+    parallelen Sessions oder einem Resume nach Tagen der Arbeitsstand einer
+    fremden Session als eigener injiziert (v1.5.3-Fix).
     """
     # Nur echte Übergabedokumente (handoff-*.md) – der Ordner enthält auch
     # eine selbst angelegte README.md, die nie als Handoff gelten darf.
@@ -102,11 +142,18 @@ def pick_handoff(project, session, session_started):
     own = [p for p in all_files if session and session in os.path.basename(p)]
     if session and session_started:
         for p in all_files:
+            m = GUARD_NAME_RE.match(os.path.basename(p))
+            if m and m.group(1) != session:
+                continue  # Wächter-Handoff einer FREMDEN Session: nie adeln
             try:
-                if os.path.getmtime(p) >= session_started - 5:
-                    own.append(p)
+                mt = os.path.getmtime(p)
             except OSError:
-                pass
+                continue
+            if mt < session_started - 5:
+                continue
+            if session_last is not None and mt > session_last + 60:
+                continue  # entstand NACH der eigenen Aktivität (z. B. Resume-Lücke)
+            own.append(p)
     pool = sorted(set(own)) or all_files
     path = max(pool, key=os.path.getmtime)
     age_days = int((time.time() - os.path.getmtime(path)) / 86_400)
@@ -215,7 +262,8 @@ def main():
             "nicht wiederholen, nicht drängen)."
         )
     started = session_start_time(payload.get("transcript_path")) if own_session else None
-    handoff = pick_handoff(project, session if own_session else "", started)
+    last = transcript_last_time(payload.get("transcript_path")) if own_session else None
+    handoff = pick_handoff(project, session if own_session else "", started, last)
     if handoff:
         name, age_days, content = handoff
         alter = "heute" if age_days == 0 else f"vor {age_days} Tag(en)"

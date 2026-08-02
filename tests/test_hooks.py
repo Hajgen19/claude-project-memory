@@ -288,6 +288,74 @@ class TestSessionStart(unittest.TestCase):
         self.assertIn("SympX", tabelle)
         self.assertNotIn("voll", tabelle)
 
+    def test_fremdes_waechter_handoff_wird_nie_geadelt(self):
+        # v1.5.3: Parallele Session B schreibt ein Wächter-Handoff (Hex-ID) in
+        # As Laufzeit-Fenster – es darf As eigenes NICHT verdrängen.
+        eigen = os.path.join(self.handoff_dir, "handoff-2026-08-01-abcd1234.md")
+        with open(eigen, "w", encoding="utf-8") as f:
+            f.write("STAND-A")
+        session_started = time.time() - 10
+        time.sleep(0.05)
+        fremd = os.path.join(self.handoff_dir, "handoff-2026-08-01-beef5678.md")
+        with open(fremd, "w", encoding="utf-8") as f:
+            f.write("STAND-B")
+        _, _, content = ss.pick_handoff(self.dir.name, "abcd1234", session_started)
+        self.assertEqual(content, "STAND-A")
+
+    def test_resume_luecke_ignoriert_spaetere_fremde_handoffs(self):
+        # v1.5.3: Resume nach Tagen – manuell benannte Handoffs, die NACH der
+        # eigenen letzten Aktivität entstanden, gehören anderen Sessions.
+        eigen = os.path.join(self.handoff_dir, "handoff-2026-07-29-abcd1234.md")
+        with open(eigen, "w", encoding="utf-8") as f:
+            f.write("STAND-ALT-EIGEN")
+        session_started = time.time() - 300
+        session_last = time.time() - 120  # eigene Aktivität endete vor 2 Minuten
+        time.sleep(0.05)
+        fremd = os.path.join(self.handoff_dir, "handoff-2026-08-01-relaunch.md")
+        with open(fremd, "w", encoding="utf-8") as f:
+            f.write("STAND-ZWISCHENZEIT-FREMD")
+        _, _, content = ss.pick_handoff(
+            self.dir.name, "abcd1234", session_started, session_last
+        )
+        self.assertEqual(content, "STAND-ALT-EIGEN")
+
+    def test_integration_guard_marker_durch_session_start_reset(self):
+        # v1.5.3: Hook-zu-Hook-Naht real – context_guard.main() schreibt den
+        # Marker, session_start.main() (compact) resettet stage, Cache bleibt.
+        tr = os.path.join(self.dir.name, "t.jsonl")
+        make_transcript(tr, tokens=250_000)  # > 200k-Default -> 1M erkannt
+        alt_env = dict(os.environ)
+        os.environ["CLAUDE_PROJECT_DIR"] = self.dir.name
+        os.environ.pop("CLAUDE_CONTEXT_WINDOW", None)
+        os.environ.pop("CLAUDE_MEMORY_STAGES", None)
+        try:
+            for hook_main in (cg.main, ss.main):
+                payload = json.dumps(
+                    {
+                        "session_id": "abcd1234",
+                        "transcript_path": tr,
+                        "cwd": self.dir.name,
+                        "stop_hook_active": False,
+                        "source": "compact",
+                    }
+                ).encode("utf-8")
+                alt_stdin, alt_stdout = sys.stdin, sys.stdout
+                sys.stdin = type("S", (), {"buffer": io.BytesIO(payload)})()
+                sys.stdout = io.StringIO()
+                try:
+                    hook_main()
+                finally:
+                    sys.stdin, sys.stdout = alt_stdin, alt_stdout
+            with open(
+                os.path.join(self.handoff_dir, ".state-abcd1234.json"), encoding="utf-8"
+            ) as f:
+                state = json.load(f)
+            self.assertEqual(state["stage"], 0)  # compact-Reset griff
+            self.assertEqual(state["window_detected"], 1_000_000)  # Cache überlebte
+        finally:
+            os.environ.clear()
+            os.environ.update(alt_env)
+
     def test_ordner_readme_ist_kein_handoff(self):
         # ensure_state_dir legt eine README.md in tmp/handoff/ – die darf
         # NIE als Übergabedokument eingespeist werden (v1.5.1-Regression).

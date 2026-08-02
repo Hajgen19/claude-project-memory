@@ -20,7 +20,7 @@ Führe alle Prüfungen aus und präsentiere am Ende die Befund-Tabelle. Das Plug
 
 ## Prüfung 3: Läuft der Wächter tatsächlich? (Marker-Beweis)
 
-Existiert `tmp/handoff/` mit mindestens einer `.state-*.json`? Der Wächter schreibt sie bei **jedem** Antwort-Ende – liefen in diesem Projekt seit der Plugin-Installation bereits Sessions mit Antworten und es gibt KEINE Marker-Datei, ist der Wächter beweisbar tot (dann sind Prüfung 1/2/6 die Verdächtigen). Frisch installiert und noch keine neue Session gelaufen: kein Befund, nur Hinweis.
+Existiert `tmp/handoff/` mit mindestens einer `.state-*.json`? Der Wächter schreibt sie bei jedem Antwort-Ende mit lesbarem usage-Block im Transcript (bei Transcript-Format-Problemen entsteht KEIN Marker – dann direkt zu Prüfung 6) – liefen in diesem Projekt seit der Plugin-Installation bereits Sessions mit Antworten und es gibt KEINE Marker-Datei, ist der Wächter beweisbar tot (dann sind Prüfung 1/2/6 die Verdächtigen). Frisch installiert und noch keine neue Session gelaufen: kein Befund, nur Hinweis.
 
 ## Prüfung 4: Schreibrechte
 

@@ -4,10 +4,10 @@
 Misst nach jeder Antwort den tatsächlichen Kontextverbrauch der Session anhand
 der Token-Zahlen im Transcript (JSONL) und stößt gestuft die Sicherung an:
 
-  Stufe 1 (ab 25 %): Changelog-Check – nur wenn die heutige Tagesdatei in
-                     dieser Session noch nicht angefasst wurde
+  Stufe 1 (ab 25 %): Changelog-Check + Learning-Frühprüfung – nur wenn die
+                     heutige Tagesdatei diese Session noch nicht sah
   Stufe 2 (ab 60 %): Handoff schreiben + Changelog nachziehen + Learnings prüfen
-  Stufe 3 (ab 85 %): Handoff aktualisieren
+  Stufe 3 (ab 85 %): Handoff aktualisieren + Learnings-Letztprüfung
 
 Mechanik: Der Hook gibt {"decision": "block", "reason": "<Auftrag>"} aus.
 Claude erhält den Auftrag als Anweisung und arbeitet weiter; der eingebaute

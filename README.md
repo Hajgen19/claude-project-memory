@@ -13,7 +13,7 @@ Das Kernproblem, das es löst: Das Kontextfenster ist das begrenzte Arbeitsgedä
 | `docs/LEARNINGS.md` * | Dieses Symptom gab es schon – was war die Ursache? | permanent, Nachschlagewerk | nein (gitignored) |
 | CLAUDE.md-Sektion (optional) | Konventionen, die das Modell proaktiv kennt | permanent | ja |
 
-\* oder eine der anderen Pfad-Varianten, die der `knowledge-base-entry`-Skill erkennt (`LEARNINGS.md`, `KNOWLEDGE.md`, `KNOWLEDGE-BASE.md`, jeweils auch im Root).
+\* oder eine der anderen Pfad-Varianten, die der `knowledge-base-entry`-Skill erkennt (`LEARNINGS-CLAUDE-PROJECT.md`, `LEARNINGS.md`, `KNOWLEDGE.md`, `KNOWLEDGE-BASE.md`, in `docs/` und im Root).
 
 Faustregel: **Interessiert es in einem Jahr noch jemanden → Changelog. Interessiert es nur die nächste Session → Handoff. Ist es ein gelöstes technisches Problem → Learnings.**
 
@@ -27,7 +27,7 @@ Beide Automatiken sind **Hooks** – kleine Python-Skripte, die Claude Code selb
 |---|---|
 | **25 %** | Changelog-Check + Learning-Frühprüfung – nur falls die heutige Tagesdatei in dieser Session noch unberührt ist |
 | **60 %** | Übergabedokument schreiben + Changelog nachziehen + Learnings prüfen (zweites Netz) |
-| **85 %** | Übergabedokument auf den letzten Stand bringen – kurz bevor kompaktiert wird |
+| **85 %** | Übergabedokument auf den letzten Stand bringen + letzte Learnings-Prüfung – kurz bevor kompaktiert wird |
 
 **Wer führt die Aufträge aus?** Der Wächter unterbricht kurz das Antwort-Ende und gibt Claude den Auftrag als Anweisung mit – Claude schreibt Changelog und Übergabedokument dann selbst, für dich sichtbar im Chat. Du musst nichts tun, kannst aber jederzeit eingreifen. Ein Zwischenruf sieht so aus:
 
@@ -37,7 +37,7 @@ Nach einer Kompaktierung sind alle Stufen automatisch wieder scharf (neuer Zyklu
 
 **Warum unterbricht der Wächter, statt sanft zu erinnern?** Bewusste Design-Entscheidung: Der Zwischenruf nutzt den Block-Mechanismus des Stop-Hooks, weil nur er einen *sofortigen* Arbeitsschritt erzwingt. Eine sanfte Kontext-Notiz würde erst beim nächsten User-Prompt wirken – der vielleicht nie kommt (Session einfach geschlossen) oder erst nach der Kompaktierung, also genau zu spät. Ein Wächter, der höflich wartet, bis jemand wieder etwas sagt, ist keiner.
 
-**Sessionstart-Hook**: Lädt beim Start, nach `/clear` und nach jeder Kompaktierung das jüngste Übergabedokument (nach Kompaktierung bevorzugt das der eigenen Session – parallele Sessions im selben Projekt kommen sich nicht in die Quere) und die Symptom-Kurzübersicht der Learnings-Datenbank in den frischen Kontext. Die neue Session weiß sofort, wo die letzte aufgehört hat und welche Probleme schon gelöst wurden. Wurde `memory-init` im Projekt noch nie ausgeführt, erinnert der Hook außerdem einmal pro Session daran.
+**Sessionstart-Hook**: Lädt beim Start, bei `resume`/`fork`, nach `/clear` und nach jeder Kompaktierung das jüngste Übergabedokument (nach Kompaktierung bevorzugt das der eigenen Session – parallele Sessions im selben Projekt kommen sich nicht in die Quere) und die Symptom-Kurzübersicht der Learnings-Datenbank in den frischen Kontext. Die neue Session weiß sofort, wo die letzte aufgehört hat und welche Probleme schon gelöst wurden. Wurde `memory-init` im Projekt noch nie ausgeführt, erinnert der Hook außerdem einmal pro Session daran.
 
 **Skills:**
 
