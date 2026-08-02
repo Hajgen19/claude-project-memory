@@ -287,7 +287,13 @@ def build_reason(stage, pct, tokens, window, handoff_file, today):
         "(seit dem letzten Handoff Erledigtes, neue Entscheidungen, aktueller nächster Schritt). "
         "Die Datei komplett neu schreiben, nicht anhängen. Falls im heutigen Changelog-Eintrag "
         "inzwischen abgeschlossene Ergebnisse fehlen, ergänze sie ebenfalls.\n\n"
-        "Danach beende deinen Turn normal."
+        "Und: Wurde seit der letzten Prüfung ein technisches Problem gelöst, auf das alle "
+        "vier Learning-Kriterien zutreffen (mehr als ein Anlauf; Ursache nicht aus der "
+        "Fehlermeldung ablesbar; wiederholbar; Lösung nicht trivial)? Falls ja, schlage dem "
+        "User JETZT einen Eintrag über den knowledge-base-entry-Skill vor – nach der "
+        "Kompaktierung sind die Details der Lösung womöglich verloren. Falls nein, "
+        "kommentarlos übergehen.\n\n"
+        "Danach beende deinen Turn normal." + fuss
     )
 
 

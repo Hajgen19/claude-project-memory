@@ -212,6 +212,8 @@ class TestStufenlogikEndToEnd(unittest.TestCase):
         self.assertIn("HANDOFF", self.reason(out))
         out = self.run_guard(tokens=180_000)  # 90 % -> Stufe 3
         self.assertIn("AKTUALISIERE", self.reason(out))
+        # v1.5.2: Stufe 3 prüft auch Learnings – letzte Chance vor Detail-Verlust
+        self.assertIn("Learning-Kriterien", self.reason(out))
         out = self.run_guard(tokens=185_000)  # bleibt still
         self.assertEqual(out, "")
 
