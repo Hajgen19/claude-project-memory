@@ -25,7 +25,7 @@ Beide Automatiken sind **Hooks** – kleine Python-Skripte, die Claude Code selb
 
 | Schwelle | Auftrag |
 |---|---|
-| **25 %** | Changelog-Check + Learning-Frühprüfung – nur falls die heutige Tagesdatei in dieser Session noch unberührt ist |
+| **25 %** | Learning-Frühprüfung – immer; dazu der Changelog-Check, falls die heutige Tagesdatei in dieser Session noch unberührt ist |
 | **60 %** | Übergabedokument schreiben + Changelog nachziehen + Learnings prüfen (zweites Netz) |
 | **85 %** | Übergabedokument auf den letzten Stand bringen + letzte Learnings-Prüfung – kurz bevor kompaktiert wird |
 
