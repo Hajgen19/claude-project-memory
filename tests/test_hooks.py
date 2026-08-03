@@ -217,6 +217,31 @@ class TestStufenlogikEndToEnd(unittest.TestCase):
         out = self.run_guard(tokens=185_000)  # bleibt still
         self.assertEqual(out, "")
 
+    def test_stufe1_prueft_learnings_auch_bei_gepflegtem_changelog(self):
+        """Regression: Bis v1.5.3 verschluckte ein bereits geschriebenes
+        Changelog die ganze Stufe 1 — inklusive der Learnings-Frage. Wer sein
+        Changelog frueh schrieb, wurde erst bei Stufe 2 (60 %) danach gefragt,
+        und geloeste Probleme gingen in der Zwischenzeit verloren."""
+        import datetime as dt
+
+        heute = dt.date.today().isoformat()
+        os.makedirs(os.path.join(self.dir.name, "changelog"), exist_ok=True)
+        with open(os.path.join(self.dir.name, "changelog", f"{heute}.md"),
+                  "w", encoding="utf-8") as f:
+            f.write("# schon gepflegt")
+
+        out = self.run_guard(tokens=60_000)          # 30 % -> Stufe 1
+        grund = self.reason(out)
+        self.assertIn("Learning-Kriterien", grund)   # Learnings-Teil bleibt
+        self.assertIn("bereits gepflegt", grund)     # Changelog-Teil entfaellt
+        self.assertNotIn("1. CHANGELOG", grund)
+
+    def test_stufe1_mit_offenem_changelog_fragt_beides(self):
+        out = self.run_guard(tokens=60_000)          # kein Changelog vorhanden
+        grund = self.reason(out)
+        self.assertIn("1. CHANGELOG", grund)
+        self.assertIn("Learning-Kriterien", grund)
+
     def test_kompaktierung_gibt_stufen_frei(self):
         self.run_guard(tokens=180_000)  # Stufe 3 verbraucht
         out = self.run_guard(tokens=60_000)  # Einbruch > 25 Punkte -> Reset -> Stufe 1

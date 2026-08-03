@@ -4,8 +4,9 @@
 Misst nach jeder Antwort den tatsächlichen Kontextverbrauch der Session anhand
 der Token-Zahlen im Transcript (JSONL) und stößt gestuft die Sicherung an:
 
-  Stufe 1 (ab 25 %): Changelog-Check + Learning-Frühprüfung – nur wenn die
-                     heutige Tagesdatei diese Session noch nicht sah
+  Stufe 1 (ab 25 %): Learning-Frühprüfung, dazu der Changelog-Check – aber
+                     nur, wenn die heutige Tagesdatei diese Session noch
+                     nicht sah (die Learning-Frage bleibt in jedem Fall)
   Stufe 2 (ab 60 %): Handoff schreiben + Changelog nachziehen + Learnings prüfen
   Stufe 3 (ab 85 %): Handoff aktualisieren + Learnings-Letztprüfung
 
@@ -231,7 +232,8 @@ def de_number(n):
     return f"{n:,}".replace(",", ".")
 
 
-def build_reason(stage, pct, tokens, window, handoff_file, today):
+def build_reason(stage, pct, tokens, window, handoff_file, today,
+                 changelog_offen=True):
     kopf = (
         f"[project-memory · Kontext-Wächter] Diese Session hat {pct:.0f} % des "
         f"Kontextfensters erreicht ({de_number(tokens)} von {de_number(window)} Tokens)."
@@ -243,6 +245,26 @@ def build_reason(stage, pct, tokens, window, handoff_file, today):
         "deaktivieren: /plugin disable project-memory.)"
     )
     if stage == 1:
+        learnings = (
+            "LEARNINGS: Wurde in dieser Session bereits ein technisches Problem "
+            "gelöst, auf das alle vier Learning-Kriterien zutreffen (mehr als ein "
+            "Anlauf; Ursache nicht aus der Fehlermeldung ablesbar; wiederholbar; Lösung "
+            "nicht trivial)? Falls ja, schlage dem User einen Eintrag über den "
+            "knowledge-base-entry-Skill des project-memory-Plugins vor."
+        )
+        # Steht die Tagesdatei schon, entfaellt nur der Changelog-Teil — der
+        # Learnings-Check laeuft trotzdem. Bis v1.5.3 verschwand er zusammen
+        # mit dem Changelog-Teil: Wer sein Changelog frueh schrieb, wurde bis
+        # Stufe 2 (60 %) nie nach Learnings gefragt, und geloeste Probleme
+        # gingen genau in der Phase verloren, in der sie entstehen.
+        if not changelog_offen:
+            return (
+                f"{kopf} Kurzer Gedächtnis-Check, einmal pro Session "
+                "(Changelog ist bereits gepflegt):\n\n"
+                f"{learnings}\n\n"
+                "Trifft das nicht zu, beende deinen Turn einfach normal, ohne das dem "
+                "User gegenüber zu erwähnen." + fuss
+            )
         return (
             f"{kopf} Kurzer Gedächtnis-Check, einmal pro Session:\n\n"
             f"1. CHANGELOG: Liegen in dieser Session bereits ABGESCHLOSSENE Ergebnisse "
@@ -252,11 +274,7 @@ def build_reason(stage, pct, tokens, window, handoff_file, today):
             f"anlegen; Überschrift '# {today} – Kurztitel', Einträge knapp und thematisch "
             "gruppiert, nur Fakten im Perfekt – nichts Halbfertiges). Lege KEINE zweite "
             "Changelog-Struktur an, wenn bereits eine andere existiert.\n\n"
-            "2. LEARNINGS: Wurde in dieser Session bereits ein technisches Problem "
-            "gelöst, auf das alle vier Learning-Kriterien zutreffen (mehr als ein "
-            "Anlauf; Ursache nicht aus der Fehlermeldung ablesbar; wiederholbar; Lösung "
-            "nicht trivial)? Falls ja, schlage dem User einen Eintrag über den "
-            "knowledge-base-entry-Skill des project-memory-Plugins vor.\n\n"
+            f"2. {learnings}\n\n"
             "Trifft beides nicht zu, beende deinen Turn einfach normal, ohne das dem "
             "User gegenüber zu erwähnen." + fuss
         )
@@ -345,6 +363,7 @@ def main():
         stage = 0
 
     new_stage = None
+    changelog_offen = True   # nur Stufe 1 wertet das aus
     if observe_only:
         pass  # nur messen, Marker aktualisieren – keine Stufe zünden
     elif pct >= s3 and stage < 3:
@@ -352,12 +371,11 @@ def main():
     elif pct >= s2 and stage < 2:
         new_stage = 2
     elif pct >= s1 and stage < 1:
-        # Changelog-Check nur, wenn die Tagesdatei diese Session noch nicht sah;
-        # sonst Stufe still als erledigt markieren.
-        if changelog_untouched(project, transcript, today):
-            new_stage = 1
-        else:
-            stage = 1
+        # Stufe 1 feuert immer. Sah die Tagesdatei diese Session schon, faellt
+        # nur der Changelog-Teil weg — der Learnings-Check bleibt (siehe
+        # build_reason). Frueher wurde die ganze Stufe still abgehakt.
+        new_stage = 1
+        changelog_offen = changelog_untouched(project, transcript, today)
 
     # Marker bei JEDEM Lauf schreiben: pct dient dem nächsten Lauf als
     # Referenz für die Kompaktierungs-Erkennung, window_detected konserviert
@@ -372,7 +390,8 @@ def main():
         return
 
     handoff_file = f"tmp/handoff/handoff-{today}-{session}.md"
-    reason = build_reason(new_stage, pct, tokens, window, handoff_file, today)
+    reason = build_reason(new_stage, pct, tokens, window, handoff_file, today,
+                          changelog_offen)
     # ensure_ascii (Default) hält die Ausgabe unabhängig vom Konsolen-Encoding
     print(json.dumps({"decision": "block", "reason": reason}))
 
