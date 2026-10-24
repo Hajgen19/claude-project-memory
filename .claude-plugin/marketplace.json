@@ -9,7 +9,7 @@
     {
       "name": "project-memory",
       "source": "./",
-      "description": "Projektgedaechtnis: Kontext-Waechter (25/60/85 %), Session-Handoff, Changelog-Konvention, Learnings-Datenbank."
+      "description": "Projektgedaechtnis: Kontext-Waechter (25/60/85 %), Session-Handoff, Changelog-Konvention, Learnings-Datenbank mit Symptom-Treffer."
     }
   ]
 }

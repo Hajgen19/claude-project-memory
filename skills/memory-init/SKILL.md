@@ -87,8 +87,17 @@ Frage den User: *„Soll ich die Projektgedächtnis-Konventionen in deine CLAUDE
 
 - **Changelog-Pflicht:** Nach jeder abgeschlossenen Aufgabe eine Zeile in die heutige Tagesdatei. Faustregel: Interessiert es in einem Jahr noch jemanden → Changelog. Interessiert es nur die nächste Session → Handoff.
 - **Learning-Kriterien** (alle vier müssen zutreffen): mehr als ein Anlauf; Ursache nicht aus der Fehlermeldung ablesbar; wiederholbar; Lösung nicht trivial. Leitfrage: *Würde ich beim nächsten Mal wieder genauso lange suchen?*
+- **Symptom-Wortlaut in Backticks:** In der Schnell-Lookup-Tabelle der Learnings den wörtlichen Fehlertext in Backticks eintragen – nur so kann der Symptom-Treffer-Hook ihn in Werkzeugausgaben wiedererkennen und den Eintrag automatisch einspielen.
+- **Betriebsregeln hier, nicht in der Übergabe:** Dauerhafte Imperative („nie `git add -A`", „Builder-Testdateien nie committen") stehen in dieser Datei unter `## Betriebsregeln`. Das Übergabedokument trägt nur Zustand (woran gearbeitet wird, Entscheidungen, nächster Schritt).
 - Ein Kontext-Wächter (Stop-Hook des Plugins) stößt die Sicherung automatisch bei 25/60/85 % Kontextfüllung an; manueller Handoff jederzeit per `/project-memory:handoff`.
+
+## Betriebsregeln
+
+<!-- Dauerhafte Regeln für dieses Projekt, eine je Zeile. Beispiel: -->
+<!-- - Nie `git add -A` – nur gezielt stagen. -->
 ```
+
+**Hinweis zur `## Betriebsregeln`-Sektion:** Hat die CLAUDE.md bereits eine Sektion mit Regeln (egal unter welchem Titel), KEINE zweite anlegen – in der Vorlage dann nur den Verweis auf die bestehende Sektion einsetzen. Die Konvention zählt, nicht der Titel: Regeln gehören in die CLAUDE.md, wo sie in jedem Turn gelten; in der Übergabe verfallen sie nach einer Session-Grenze und blähen das Dokument auf (der `doctor`-Skill warnt ab 15 Regelzeilen in einer Übergabe).
 
 Diff zeigen, Bestätigung abwarten, dann schreiben. Bestehenden CLAUDE.md-Inhalt niemals verändern, nur anfügen.
 
@@ -117,6 +126,7 @@ Dann kompakt melden: was geändert wurde (mit Pfaden), was übersprungen wurde u
 - `/project-memory:handoff` – manuelle Session-Übergabe
 - `/project-memory:knowledge-base-entry` bzw. „neues Learning" – Wissensdatenbank-Eintrag
 - Der Kontext-Wächter läuft automatisch; nach einer Kompaktierung liest der Sessionstart-Hook den letzten Stand selbstständig ein.
+- Der Symptom-Treffer-Hook (PostToolUse) spielt einen Learnings-Eintrag automatisch ein, sobald sein Backtick-Symptom aus der Lookup-Tabelle wörtlich in einer Werkzeugausgabe auftaucht – Präfix `[project-memory · Symptom-Treffer]`, je Eintrag einmal pro Session, abschaltbar per `CLAUDE_MEMORY_SYMPTOMS=0` im `env`-Block.
 
 ## Python-Kommando (Hinweis für Schritt 1.5)
 

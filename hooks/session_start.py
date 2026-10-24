@@ -168,16 +168,26 @@ def pick_handoff(project, session, session_started, session_last=None):
     return os.path.basename(path), age_days, content
 
 
-def learnings_lookup(project):
-    """(relativer pfad, lookup-tabelle) der Wissensdatenbank – oder None."""
+def find_kb_path(project):
+    """(relativer pfad, absoluter pfad) der Wissensdatenbank – oder None.
+
+    Erste Datei aus KB_CANDIDATES gewinnt; die Reihenfolge ist die des
+    knowledge-base-entry-Skills. Wird auch vom Symptom-Hook genutzt, damit
+    beide Hooks garantiert dieselbe Datei meinen.
+    """
     for candidate in KB_CANDIDATES:
         path = os.path.join(project, candidate)
         if os.path.isfile(path):
-            break
-    else:
-        return None
-    with open(path, encoding="utf-8", errors="replace") as f:
-        lines = f.read().splitlines()
+            return candidate.replace(os.sep, "/"), path
+    return None
+
+
+def extract_lookup_lines(lines):
+    """Zeilen der Lookup-Sektion (ohne deren Überschrift) – oder [].
+
+    Die Sektion beginnt mit einer Überschrift aus LOOKUP_PREFIXES und endet
+    an der nächsten '## '-Überschrift.
+    """
     section, collecting = [], False
     for line in lines:
         if line.startswith("## "):
@@ -187,12 +197,23 @@ def learnings_lookup(project):
             continue
         if collecting:
             section.append(line)
-    table = "\n".join(section).strip()
+    return section
+
+
+def learnings_lookup(project):
+    """(relativer pfad, lookup-tabelle) der Wissensdatenbank – oder None."""
+    found = find_kb_path(project)
+    if not found:
+        return None
+    rel_path, path = found
+    with open(path, encoding="utf-8", errors="replace") as f:
+        lines = f.read().splitlines()
+    table = "\n".join(extract_lookup_lines(lines)).strip()
     if not table or "|" not in table:
         return None
     if len(table) > MAX_LOOKUP_CHARS:
         table = table[:MAX_LOOKUP_CHARS] + "\n[… gekürzt]"
-    return candidate.replace(os.sep, "/"), table
+    return rel_path, table
 
 
 def reset_guard_marker(project, session):

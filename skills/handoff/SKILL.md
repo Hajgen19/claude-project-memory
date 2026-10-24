@@ -11,6 +11,8 @@ Include a "suggested skills" section in the document, which suggests skills that
 
 Do not duplicate content already captured in other artifacts (specs, plans, ADRs, issues, commits, diffs). Reference them by path or URL instead.
 
+A handoff carries state, not rules. Standing imperatives ("never `git add -A`", "never commit builder test files") belong in the project's `CLAUDE.md` under `## Betriebsregeln`, where they apply in every turn; in a handoff they expire at the next session boundary. If the conversation produced such a rule, suggest adding it to `CLAUDE.md` instead of writing it into the handoff.
+
 Redact any sensitive information, such as API keys, passwords, or personally identifiable information.
 
 If the user passed arguments, treat them as a description of what the next session will focus on and tailor the doc accordingly.

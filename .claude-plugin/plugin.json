@@ -1,7 +1,7 @@
 {
   "name": "project-memory",
-  "description": "Projektgedaechtnis fuer jedes Claude-Code-Projekt: Kontext-Waechter sichert den Arbeitsstand, bevor er verloren geht (Changelog, Handoff, Learnings), und speist ihn in neue Sessions zurueck.",
-  "version": "1.5.4",
+  "description": "Projektgedaechtnis fuer jedes Claude-Code-Projekt: Kontext-Waechter sichert den Arbeitsstand, bevor er verloren geht (Changelog, Handoff, Learnings), und speist ihn in neue Sessions zurueck; Symptom-Treffer spielt dokumentierte Learnings automatisch ein, sobald ihr Fehlertext in einer Werkzeugausgabe auftaucht.",
+  "version": "1.6.0",
   "author": {
     "name": "Hajgen19",
     "url": "https://github.com/Hajgen19"

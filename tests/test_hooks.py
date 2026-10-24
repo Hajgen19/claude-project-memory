@@ -436,9 +436,15 @@ class TestManifesteUndFrontmatter(unittest.TestCase):
             hooks = json.load(f)
         self.assertIn("Stop", hooks["hooks"])
         self.assertIn("SessionStart", hooks["hooks"])
+        self.assertIn("PostToolUse", hooks["hooks"])
         matcher = hooks["hooks"]["SessionStart"][0]["matcher"]
         for source in ("startup", "resume", "clear", "compact", "fork"):
             self.assertIn(source, matcher)
+        # v1.6.0: Symptom-Hook – Agent-Berichte sind Pflicht, nicht optional
+        matcher = hooks["hooks"]["PostToolUse"][0]["matcher"]
+        for tool in ("Bash", "Read", "Grep", "Agent"):
+            self.assertIn(tool, matcher)
+        self.assertIn("symptom_match.py", hooks["hooks"]["PostToolUse"][0]["hooks"][0]["args"][0])
 
     def test_alle_skills_haben_gueltige_frontmatter(self):
         skills_dir = os.path.join(self.ROOT, "skills")

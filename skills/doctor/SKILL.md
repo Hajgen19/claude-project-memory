@@ -1,6 +1,6 @@
 ---
 name: doctor
-description: Diagnose des project-memory-Plugins im aktuellen Projekt - prueft Python, Hook-Registrierung, Marker, Schreibrechte, Konfiguration und Transcript-Lesbarkeit. Die Antwort auf das Fail-silent-Design.
+description: Diagnose des project-memory-Plugins im aktuellen Projekt - prueft Python, Hook-Registrierung, Marker, Schreibrechte, Konfiguration, Transcript-Lesbarkeit, Betriebsregeln in der Uebergabe und die Reichweite des Symptom-Hooks. Die Antwort auf das Fail-silent-Design.
 disable-model-invocation: true
 ---
 
@@ -16,7 +16,7 @@ Führe alle Prüfungen aus und präsentiere am Ende die Befund-Tabelle. Das Plug
 
 ## Prüfung 2: Hooks registriert?
 
-`claude plugin details project-memory@claude-project-memory` ausführen. Erwartung im Component inventory: `Hooks (2) Stop, SessionStart` und `Skills (4)`. Fehlen die Hooks: Plugin neu installieren (`/plugin uninstall` + `/plugin install`), danach Session neu starten.
+`claude plugin details project-memory@claude-project-memory` ausführen. Erwartung im Component inventory: `Hooks (3) Stop, SessionStart, PostToolUse` und `Skills (4)`. Fehlen die Hooks: Plugin neu installieren (`/plugin uninstall` + `/plugin install`), danach Session neu starten.
 
 ## Prüfung 3: Läuft der Wächter tatsächlich? (Marker-Beweis)
 
@@ -44,9 +44,16 @@ Den Wächter einmal direkt mit synthetischem Payload aufrufen. **Wichtig: Den Pa
 
 Erwartung: Exit 0, und danach existiert `tmp/handoff/.state-doctor01.json` (Payload- und State-Datei anschließend wieder löschen). Entsteht der Marker nicht, obwohl Python läuft: Transcript-Format-Problem (Claude-Code-Update könnte die JSONL-Struktur geändert haben) – das ist die bekannte Wartungs-Hypothek, Issue im Plugin-Repo aufmachen.
 
-## Prüfung 7: Bestandsübersicht (Info, kein Fehler)
+## Prüfung 7: Betriebsregeln in der Übergabe & Reichweite des Symptom-Hooks
 
-Kurz auflisten: Anzahl Handoffs in `tmp/handoff/`, `.init-done` vorhanden?, Learnings-Datenbank gefunden (welcher Kandidaten-Pfad, wie viele Einträge)?, heutige Changelog-Datei vorhanden?
+Einen Befehl ausführen, Ausgabe übernehmen – Bash/sh: `python "<PLUGIN_ROOT>/hooks/doctor_checks.py" "<PROJEKT>"` · PowerShell identisch. Er liefert zwei Zeilen:
+
+1. **Betriebsregeln:** Zählt im jüngsten Übergabedokument die Listenzeilen (`- ` / `* `), die mit „nie", „niemals" oder „immer" beginnen (optional „nicht" + Verb). Mehr als 15 davon → ✗ mit Hinweis: Das Dokument trägt dauerhafte Regeln statt Zustand; die gehören in die projektweite `CLAUDE.md` unter `## Betriebsregeln` (Konvention siehe README und `memory-init`), die Übergabe nur den Stand. Dem User anbieten, die Regelzeilen in die CLAUDE.md zu verschieben – mit Diff, nicht ungefragt. „nur" und „keine" zählen bewusst nicht (Zustandssätze wie „Keine Änderungen heute" wären Fehlalarme).
+2. **Symptom-Hook:** Wie viele Zeilen der Lookup-Tabelle eine Backtick-Suchphrase tragen. Nur diese Zeilen kann der Symptom-Treffer-Hook (PostToolUse) überhaupt erkennen – Zeilen mit rein beschreibendem Text sind für ihn unsichtbar. Liegt die Abdeckung deutlich unter 100 %, dem User vorschlagen, bei den betroffenen Zeilen den wörtlichen Fehlertext in Backticks nachzutragen.
+
+## Prüfung 8: Bestandsübersicht (Info, kein Fehler)
+
+Kurz auflisten: Anzahl Handoffs in `tmp/handoff/`, `.init-done` vorhanden?, Learnings-Datenbank gefunden (welcher Kandidaten-Pfad, wie viele Einträge)?, heutige Changelog-Datei vorhanden?, Symptom-Marker `.symptoms-*.json` vorhanden (zeigt, dass der Symptom-Hook in dieser oder einer früheren Session mindestens einmal getroffen hat – ohne Treffer entsteht keiner, das ist kein Fehler)?
 
 ## Befund
 

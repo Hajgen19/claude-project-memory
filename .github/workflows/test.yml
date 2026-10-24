@@ -19,6 +19,6 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - name: Syntax-Check der Hooks
-        run: python -m py_compile hooks/context_guard.py hooks/session_start.py
+        run: python -m py_compile hooks/context_guard.py hooks/session_start.py hooks/symptom_match.py hooks/doctor_checks.py
       - name: Test-Suite
         run: python -m unittest discover tests -v

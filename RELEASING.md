@@ -14,7 +14,7 @@ Beides muss grün sein, bevor irgendetwas anderes passiert. (Die Suite läuft zu
 ## 1. Syntax
 
 ```
-python -m py_compile hooks/context_guard.py hooks/session_start.py
+python -m py_compile hooks/context_guard.py hooks/session_start.py hooks/symptom_match.py hooks/doctor_checks.py
 ```
 
 ## 2. Frisch installieren (der echte Nutzer-Weg, nicht `--plugin-dir`)
@@ -34,7 +34,7 @@ claude plugin install project-memory@claude-project-memory
 claude plugin details project-memory@claude-project-memory
 ```
 
-Erwartung: `Skills (4) doctor, handoff, knowledge-base-entry, memory-init`, `Hooks (2) Stop, SessionStart`, korrekte Versionsnummer.
+Erwartung: `Skills (4) doctor, handoff, knowledge-base-entry, memory-init`, `Hooks (3) Stop, SessionStart, PostToolUse`, korrekte Versionsnummer.
 
 ## 4. End-to-End: Feuert der Wächter und handelt das Modell?
 
@@ -48,6 +48,16 @@ claude -p "Wir bauen ein Tool namens Alpha. Entscheidung: Python statt Node, weg
 (Der Prompt braucht Mini-Substanz – bei einem reinen „Sag ok" urteilt das Modell korrekt, dass es nichts zu sichern gibt, und schreibt keinen Handoff.)
 
 **Erfolgskriterium (beides muss zutreffen):** (a) `tmp/handoff/` existiert mit `.state-*.json`, `.gitignore` (Inhalt `*`) und `README.md` – beweist, dass der Hook läuft und schreibt. (b) Die Modell-Antwort verarbeitet den Sicherungsauftrag erkennbar (erwähnt den Zwischenruf/das Plugin oder schreibt ein `handoff-*.md`) – beweist, dass der Block ankommt. Ob tatsächlich eine Handoff-Datei entsteht, entscheidet das Modell nach Substanz der Test-Session; bei Ein-Prompt-Sessions lehnt es zu Recht ab. Fehlt dagegen schon der Marker, ist die Kette gerissen – wegen des Fail-silent-Designs gibt es keinen anderen Ort, an dem das sichtbar würde.
+
+## 4b. Symptom-Treffer direkt anstoßen
+
+Im selben Testverzeichnis eine `docs/LEARNINGS.md` mit einer Lookup-Zeile `| \`Existing tests are immutable\` | [E-001](#e-001-test) |` und einem Eintrag `## E-001 — Test … ---` anlegen, dann (Payload als Datei, nicht per `echo` – siehe doctor-Skill):
+
+```json
+{"session_id":"rel00001","cwd":"<TESTVERZEICHNIS>","hook_event_name":"PostToolUse","tool_name":"Bash","tool_response":{"stdout":"<mindestens 200 Zeichen Füllung> Error: Existing tests are immutable","stderr":""}}
+```
+
+`python hooks/symptom_match.py < payload.json` muss ein JSON mit `additionalContext` und dem Banner `[project-memory · Symptom-Treffer]` liefern; ein zweiter Aufruf derselben Datei bleibt still, und `tmp/handoff/.symptoms-rel00001.json` enthält `E-001`. Danach `python hooks/doctor_checks.py <TESTVERZEICHNIS>` – zwei Zeilen, Exit 0.
 
 ## 5. Aufräumen und von GitHub neu installieren
 

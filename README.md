@@ -11,15 +11,17 @@ Das Kernproblem, das es löst: Das Kontextfenster ist das begrenzte Arbeitsgedä
 | `changelog/YYYY-MM-DD.md` | Was wurde wann getan? | permanent, append-only | ja |
 | `tmp/handoff/` | Wo steht die Arbeit gerade? | eine Session-Grenze | nein (gitignored) |
 | `docs/LEARNINGS.md` * | Dieses Symptom gab es schon – was war die Ursache? | permanent, Nachschlagewerk | nein (gitignored) |
-| CLAUDE.md-Sektion (optional) | Konventionen, die das Modell proaktiv kennt | permanent | ja |
+| CLAUDE.md-Sektion (optional) | Konventionen und Betriebsregeln, die das Modell proaktiv kennt | permanent | ja |
 
 \* oder eine der anderen Pfad-Varianten, die der `knowledge-base-entry`-Skill erkennt (`LEARNINGS-CLAUDE-PROJECT.md`, `LEARNINGS.md`, `KNOWLEDGE.md`, `KNOWLEDGE-BASE.md`, in `docs/` und im Root).
 
-Faustregel: **Interessiert es in einem Jahr noch jemanden → Changelog. Interessiert es nur die nächste Session → Handoff. Ist es ein gelöstes technisches Problem → Learnings.**
+Faustregel: **Interessiert es in einem Jahr noch jemanden → Changelog. Interessiert es nur die nächste Session → Handoff. Ist es ein gelöstes technisches Problem → Learnings. Ist es eine dauerhafte Regel → CLAUDE.md.**
+
+Zur letzten Regel eine Konvention, die sich im Einsatz als nötig erwiesen hat: **Die Übergabe trägt Zustand, keine Regeln.** Dauerhafte Imperative („nie `git add -A`", „Builder-Testdateien nie committen") gehören in die projektweite `CLAUDE.md` unter `## Betriebsregeln`, wo sie in jedem Turn gelten – in einem Handoff verfallen sie an der nächsten Session-Grenze oder werden so lange mitgeschleppt, bis das Dokument aus Regeln statt aus Stand besteht. Das Plugin erzwingt hier nichts Neues: `memory-init` legt die Sektion in der CLAUDE.md-Vorlage an, der `handoff`-Skill kennt die Trennung, und der `doctor`-Skill warnt, wenn eine Übergabe mehr als 15 Listenzeilen mit „nie", „niemals" oder „immer" enthält.
 
 ## Wie es arbeitet
 
-Beide Automatiken sind **Hooks** – kleine Python-Skripte, die Claude Code selbst bei bestimmten Ereignissen ausführt: eins nach jeder Antwort (Stop), eins beim Sessionstart.
+Die drei Automatiken sind **Hooks** – kleine Python-Skripte, die Claude Code selbst bei bestimmten Ereignissen ausführt: eins nach jeder Antwort (Stop), eins beim Sessionstart, eins nach jeder Werkzeugausgabe (PostToolUse).
 
 **Kontext-Wächter** (Stop-Hook): Misst nach jeder Antwort die tatsächliche Kontextfüllung (input + cache-read + cache-creation aus dem Transcript – gemessen, nicht geschätzt) und stößt gestuft an, je einmal pro Session und Stufe:
 
@@ -39,12 +41,22 @@ Nach einer Kompaktierung sind alle Stufen automatisch wieder scharf (neuer Zyklu
 
 **Sessionstart-Hook**: Lädt beim Start, bei `resume`/`fork`, nach `/clear` und nach jeder Kompaktierung das jüngste Übergabedokument (nach Kompaktierung bevorzugt das der eigenen Session – parallele Sessions im selben Projekt kommen sich nicht in die Quere) und die Symptom-Kurzübersicht der Learnings-Datenbank in den frischen Kontext. Die neue Session weiß sofort, wo die letzte aufgehört hat und welche Probleme schon gelöst wurden. Wurde `memory-init` im Projekt noch nie ausgeführt, erinnert der Hook außerdem einmal pro Session daran.
 
+**Symptom-Treffer** (PostToolUse-Hook, v1.6): Die Lookup-Tabelle beim Sessionstart hilft nur, wenn das Modell beim passenden Symptom *selbst* nachschlägt – und genau das unterbleibt in der Praxis, obwohl der Fehlertext wörtlich durch die Werkzeugausgabe läuft (in zwei Monaten Einsatz wurde dieselbe dokumentierte Falle zweimal betreten, der Eintrag stand seit Wochen in der Tabelle). Dieser Hook übernimmt das Nachschlagen: Nach jeder Ausgabe von `Bash`, `Read`, `Grep` und `Agent` prüft er, ob ein in **Backticks** gesetzter Fehlertext aus der Spalte „Was du siehst" wörtlich darin vorkommt (Groß-/Kleinschreibung und Mehrfach-Leerzeichen egal) – und spielt bei Treffer den **vollständigen Eintrag** ein, bevor das Modell weiterarbeitet:
+
+> *[project-memory · Symptom-Treffer] Die Werkzeugausgabe enthält das Symptom von E-011. Lies den Eintrag, bevor du weiterarbeitest:*
+>
+> *## E-011 — Builder-Testdateien*
+> *\*\*Symptom:\*\* `Existing tests are immutable` …*
+> *\*\*Root Cause:\*\* Vom Menschen committete Testdateien sind für den Builder unveränderlich. …*
+
+Spielregeln, damit das kein Rauschen wird: höchstens ein Eintrag je Werkzeugaufruf (der längste Treffer gewinnt), jeder Eintrag je Session nur einmal (Marker `tmp/handoff/.symptoms-<session>.json`), und wenn die Ausgabe selbst Learnings enthält (ein `## E-nnn`-Header, die Lookup-Kopfzeile, der eigene Banner – also etwa `cat LEARNINGS.md`), schweigt der Hook. Nur Backtick-Inhalte zählen als Suchphrase: Beschreibender Text wie „Deploy kopiert alte Version" taucht nie wörtlich in einer Ausgabe auf, hätte aber Fehlalarmpotenzial. **Wer einen Eintrag automatisch finden lassen will, trägt sein Symptom wörtlich und in Backticks in die Lookup-Tabelle ein** – der `doctor`-Skill zeigt, wie viele Zeilen das bereits erfüllen. Kein Embedding, kein externer Dienst, nur Substring-Suche in der Standardbibliothek: Der Abgleich dauert bei 500 Einträgen unter 10 ms; der eigentliche Preis ist der Python-Start je Werkzeugaufruf (≈ 30–50 ms), bewusst in Kauf genommen. Abschalten jederzeit per `"CLAUDE_MEMORY_SYMPTOMS": "0"` im `env`-Block der Projekt-`settings.json`. Am Dateiformat ändert sich nichts – bestehende Datenbanken funktionieren ohne Migration.
+
 **Skills:**
 
 | Skill | Aufruf | Zweck |
 |---|---|---|
 | `memory-init` | `/project-memory:memory-init` | Das Andock-Ritual: `.gitignore` absichern, `changelog/` starten, Wächter-Konfiguration eintragen, optional CLAUDE.md-Sektion. Einmal pro Projekt. |
-| `doctor` | `/project-memory:doctor` | Funktions-Diagnose auf Zuruf: prüft Python, Hook-Registrierung, Marker, Schreibrechte, Konfiguration und die komplette Hook-Kette. Die Antwort auf das Fail-silent-Design – jederzeit, ändert nichts. |
+| `doctor` | `/project-memory:doctor` | Funktions-Diagnose auf Zuruf: prüft Python, Hook-Registrierung, Marker, Schreibrechte, Konfiguration, die komplette Hook-Kette, Betriebsregeln in der Übergabe und die Reichweite des Symptom-Hooks. Die Antwort auf das Fail-silent-Design – jederzeit, ändert nichts. |
 | `handoff` | `/project-memory:handoff` | Manuelle Session-Übergabe nach `tmp/handoff/`, jederzeit. |
 | `knowledge-base-entry` | `/project-memory:knowledge-base-entry` oder „neues Learning" | Strukturierter Eintrag in die Wissensdatenbank (Symptom → Root Cause → Fix → Tags), formaterhaltend, mit Volltext-Suche per Symptom-Wortlaut. |
 
@@ -102,6 +114,8 @@ Der Init-Schritt ist wichtig: Er trägt die Learnings-Dateinamen in die `.gitign
 
 Ungültige Angaben (falsche Anzahl, Werte außerhalb 0–100, doppelte Werte) fallen still auf die Defaults `25,60,85` zurück. Wer Stufe 3 näher an die Kompaktierung legt (z. B. `90`), riskiert, dass eine einzige lange Antwort darüber hinwegträgt und das letzte Update ausfällt – die 85 sind bewusst als Puffer gewählt.
 
+- **Symptom-Treffer abschalten (v1.6):** `"CLAUDE_MEMORY_SYMPTOMS": "0"` im selben `env`-Block. Jeder andere Wert (oder keiner) lässt den Hook laufen.
+
 - Die Hooks enden in **jedem** Fehlerfall mit Exit 0 – ein kaputter Wächter darf niemals die Session stören.
 
 ## Grenzen, ehrlich benannt
@@ -110,6 +124,7 @@ Ungültige Angaben (falsche Anzahl, Werte außerhalb 0–100, doppelte Werte) fa
 - **Projekte, deren Build `tmp/` leert** (Clean-Tasks): Ein solcher Task löscht auch Übergabedokumente und Wächter-Marker. `memory-init` warnt in dem Fall; die Abhilfe ist, den Clean-Task `tmp/handoff/` verschonen zu lassen.
 - **Sessions, die unter 25 % bleiben,** bekommen keinen automatischen Anstoß – dort trägt die Konvention aus der CLAUDE.md-Sektion (oder ein manuelles `/project-memory:handoff`).
 - **Eigene Changelog-Konventionen werden respektiert:** Der Wächter verweist auf die Konvention der Projekt-CLAUDE.md und legt keine zweite Struktur an. Nutzt dein Projekt aber ein anderes Changelog-Format als `changelog/YYYY-MM-DD.md`, kann die 25-%-Stufe nicht erkennen, ob du schon eingetragen hast – sie erinnert dann einmal pro Session, auch wenn alles erledigt ist. Harmlos, nur redundant.
+- **Der Symptom-Treffer findet nur, was wörtlich in Backticks steht.** Lookup-Zeilen mit rein beschreibendem Text sind für ihn unsichtbar – gewollt, denn Paraphrasen tauchen nie wörtlich in Ausgaben auf, würden aber Fehlalarme produzieren. Und er feuert nur auf Ausgaben, die durch `Bash`, `Read`, `Grep` oder `Agent` kommen; ein Symptom, das nur der User in den Chat schreibt, erreicht ihn nicht – dafür bleibt die Lookup-Tabelle vom Sessionstart zuständig.
 
 ## Was es bewusst NICHT tut
 
